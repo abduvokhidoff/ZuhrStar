@@ -17,6 +17,15 @@ const PrivateRoute = () => {
 	if (user.role === 'Mentor') {
 		return <Navigate to='/mentor' replace />
 	}
+	if (user.role === 'Admin') {
+		return <Navigate to='/admin' replace />
+	}
+	if (user.role === 'SuperAdmin') {
+		return <Navigate to='/super-admin' replace />
+	}
+	if (user.role === 'SupportMentor') {
+		return <Navigate to='/support-mentor' replace />
+	}
 
 }
 

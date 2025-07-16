@@ -5,6 +5,7 @@ import AdminLayout from '../pages/AdminLayout'
 import MentorLayout from '../pages/MentorLayout'
 import PrivateRoute from '../components/PrivateRoute'
 import HeadMentorLayout from '../pages/HeadMentorLayout'
+import SupportMentorLayout from '../pages/SupportMentorLayout'
 
 
 const routes = createBrowserRouter([
@@ -14,7 +15,7 @@ const routes = createBrowserRouter([
 	},
 	{
 		path: '/',
-		element: <PrivateRoute/>
+		element: <PrivateRoute />,
 	},
 	{
 		path: '/super-admin',
@@ -30,7 +31,11 @@ const routes = createBrowserRouter([
 	},
 	{
 		path: '/mentor',
-		element: <MentorLayout/>,
+		element: <MentorLayout />,
+	},
+	{
+		path: '/support-mentor',
+		element: <SupportMentorLayout />,
 	},
 ])
 
