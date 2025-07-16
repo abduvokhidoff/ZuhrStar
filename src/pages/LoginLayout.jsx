@@ -102,7 +102,11 @@ const LoginLayout = () => {
 									type='button'
 									onClick={() => setShowPassword(prev => !prev)}
 								>
-									{showPassword ? <EyeClosed size={24} /> : <Eye size={24} />}
+									{showPassword ? (
+										<EyeClosed size={24} className='text-[#aab0bf]' />
+									) : (
+										<Eye size={24} className='text-[#aab0bf]' />
+									)}
 								</button>
 							</div>
 						</div>
