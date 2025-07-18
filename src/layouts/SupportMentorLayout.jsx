@@ -2,8 +2,13 @@ import React from 'react'
 
 const SupportMentorLayout = () => {
   return (
-    <div>SupportMentorLayout</div>
-  )
+		<div>
+			<div>
+				<Aside />
+			</div>
+			<div></div>
+		</div>
+	)
 }
 
 export default SupportMentorLayout
