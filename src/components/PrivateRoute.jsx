@@ -11,19 +11,19 @@ const PrivateRoute = () => {
 	}
 
 	// Redirect by role
-	if (user.role === 'HeadMentor') {
+	if (user.role.toLowerCase() === 'headmentor') {
 		return <Navigate to='/head-mentor' replace />
 	}
-	if (user.role === 'Mentor') {
+	if (user.role.toLowerCase() === 'mentor') {
 		return <Navigate to='/mentor' replace />
 	}
-	if (user.role === 'Admin') {
+	if (user.role.toLowerCase() === 'admin') {
 		return <Navigate to='/admin' replace />
 	}
-	if (user.role === 'SuperAdmin') {
+	if (user.role.toLowerCase() === 'superadmin') {
 		return <Navigate to='/super-admin' replace />
 	}
-	if (user.role === 'SupportMentor') {
+	if (user.role.toLowerCase() === 'supportteacher') {
 		return <Navigate to='/support-mentor' replace />
 	}
 

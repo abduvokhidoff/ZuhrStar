@@ -7,67 +7,123 @@ import {
 	MessagesSquare,
 	FolderOpen,
 	Folder,
+	UserRound,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import logo from '../assets/logo.png'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 
 const Aside = () => {
 	const user = useSelector(state => state.auth.user)
+	const location = useLocation()
 
 	if (!user) return null
 
 	// Define role-specific menu items
 	const menusByRole = {
-		Mentor: [
-			{ icon: LayoutGrid, label: 'Dashboard' },
-			{ icon: Calendar, label: 'Calendar' },
-			{ icon: Plane, label: 'Trips' },
+		mentor: [
+			{ icon: LayoutGrid, label: 'Dashboard', path: '/mentor/' },
+			{ icon: Layers, label: `O'quvchilar`, path: `/mentor/o'quvchilar` },
+			{ icon: Calendar, label: 'Kurslar', path: '/mentor/kurslar' },
+			{ icon: MessagesSquare, label: 'Guruhlar', path: '/mentor/guruhlar' },
+			{ icon: FolderOpen, label: 'Sozlamalar', path: '/mentor/sozlamalar' },
 		],
-		HeadMentor: [
-			// Super Mentor
-			{ icon: LayoutGrid, label: 'Dashboard',  },
-			{ icon: Layers, label: 'Oquvchilar', path:`o'quvchilar` },
-			{ icon: Calendar, label: 'Kurslar', path: `kurslar` },
-			{ icon: Plane, label: 'Mentorlar', path: 'mentorlar' },
-			{ icon: MessagesSquare, label: 'Guruhlar', path: 'guruhlar' },
-			{ icon: FolderOpen, label: 'Hisobotlar', path: 'hisobotlar' },
-			{ icon: FolderOpen, label: 'Sozlamalar', path: 'sozlamalar' },
+		headmentor: [
+			{ icon: LayoutGrid, label: 'Dashboard', path: '/head-mentor/' },
+			{ icon: Layers, label: 'Oquvchilar', path: `/head-mentor/o'quvchilar` },
+			{ icon: Calendar, label: 'Kurslar', path: `/head-mentor/kurslar` },
+			{ icon: Plane, label: 'Mentorlar', path: '/head-mentor/mentorlar' },
+			{
+				icon: MessagesSquare,
+				label: 'Guruhlar',
+				path: '/head-mentor/guruhlar',
+			},
+			{
+				icon: FolderOpen,
+				label: 'Hisobotlar',
+				path: '/head-mentor/hisobotlar',
+			},
+			{
+				icon: FolderOpen,
+				label: 'Sozlamalar',
+				path: '/head-mentor/sozlamalar',
+			},
 		],
-		Admin: [
-			{ icon: LayoutGrid, label: 'Dashboard' },
-			{ icon: FolderOpen, label: 'Projects' },
-			{ icon: Folder, label: 'Archive' },
+		admin: [
+			{ icon: LayoutGrid, label: 'Dashboard', path: '/admin/' },
+			{ icon: Layers, label: `O'quvchilar`, path: `/admin/o'quvchilar` },
+			{ icon: Calendar, label: 'Kurslar', path: '/admin/kurslar' },
+			{ icon: Plane, label: 'Mentorlar', path: '/admin/mentorlar' },
+			{ icon: UserRound, label: `To'lovlar`, path: `/admin/to'lovlar` },
+			{ icon: MessagesSquare, label: 'Guruhlar', path: '/admin/guruhlar' },
+			{ icon: FolderOpen, label: 'Google Meet', path: '/admin/google-meet' },
+			{
+				icon: FolderOpen,
+				label: 'Bildirishnomalar',
+				path: '/admin/bildirishnomalar',
+			},
+			{ icon: FolderOpen, label: 'Sozlamalar', path: '/admin/sozlamalar' },
 		],
-		SuperAdmin: [
-			{ icon: LayoutGrid, label: 'Dashboard' },
-			{ icon: Layers, label: 'Manage' },
-			{ icon: MessagesSquare, label: 'Messages' },
-			{ icon: FolderOpen, label: 'Storage' },
+		superadmin: [
+			{ icon: LayoutGrid, label: 'Dashboard', path: '/super-admin/' },
+			{ icon: Layers, label: `Students`, path: `/super-admin/students` },
+			{ icon: Calendar, label: 'Calendar', path: '/super-admin/calendar' },
+			{ icon: Plane, label: 'Finance', path: '/super-admin/finance' },
+			{
+				icon: MessagesSquare,
+				label: 'Employees',
+				path: '/super-admin/employees',
+			},
+			{ icon: FolderOpen, label: 'Marketing', path: '/super-admin/marketing' },
+			{ icon: FolderOpen, label: 'Groups', path: '/super-admin/groups' },
+			{ icon: FolderOpen, label: 'Problems', path: '/super-admin/problems' },
+			{
+				icon: FolderOpen,
+				label: 'Sozlamalar',
+				path: '/super-admin/sozlamalar',
+			},
+		],
+		supportteacher: [
+			{ icon: LayoutGrid, label: 'Dashboard', path: '/support-mentor/' },
+			{ icon: Layers, label: `Darslar`, path: `/support-mentor/darslar` }
 		],
 	}
 
-	const menuItems = menusByRole[user.role] || []
+	const menuItems = menusByRole[user.role.toLowerCase()] || []
 
 	return (
-		<aside className='w-[207px] bg-[#f8faff] h-screen px-[15px] flex flex-col items-start fixed top-0 left-0 bg-[white] rounded-[20px] shadow-md '>
+		<aside className='w-[207px] bg-[#f8faff] h-screen px-[15px] py-[40px] flex flex-col items-start gap-[42px] fixed top-0 left-0 bg-[white]'>
 			<div>
-				<img src={logo} alt="" />
+				<img src={logo} className='w-[50px]' alt='' />
 			</div>
-			<div className='gap-[15px] flex flex-col items-start'>
+			<div className='gap-[15px] flex flex-col items-start w-[100%]'>
 				{menuItems.map((item, index) => {
 					const Icon = item.icon
 					return (
 						<NavLink
 							key={index}
 							to={item.path}
-							className='flex items-center gap-[15px] bg-[white] w-[100%] px-[8px] py-[10px] rounded-[10px]'
+							className={`flex items-center gap-[15px]  w-[100%] px-[8px] py-[10px] rounded-[10px] ${
+								item.path === location.pathname ? 'bg-[#ebf3ff]' : 'bg-[white]'
+							}`}
 						>
 							<Icon
-								className='text-gray-500 group-hover:text-blue-500 transition duration-150'
+								className={
+									item.path === location.pathname
+										? 'text-[#3F8CFF]'
+										: 'text-[#7D8592]'
+								}
 								size={24}
 							/>
-							<p>{item.label}</p>
+							<p
+								className={`font-[Nunito Sans] font-[600] ${
+									item.path === location.pathname
+										? 'text-[#3F8CFF]'
+										: 'text-[#7D8592]'
+								}`}
+							>
+								{item.label}
+							</p>
 						</NavLink>
 					)
 				})}

@@ -6,9 +6,11 @@ import Navbar from '../components/Navbar'
 const HeadMentorLayout = () => {
 	return (
 		<div className='flex'>
-			<Aside />
+			<div>
+				<Aside />
+			</div>
 			<div className='ml-[207px] w-full flex flex-col gap-[20px]'>
-				<Navbar/>
+				<Navbar />
 				<Outlet />
 			</div>
 		</div>
