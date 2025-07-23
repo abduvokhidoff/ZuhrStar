@@ -20,6 +20,12 @@ const Aside = () => {
 	if (!user) return null
 
 	// Define role-specific menu items
+	//har bitta rolaga ozini arrayi bor oshani ichida object ochish kere
+	// icon bu ikonkasi
+	//label bu button ustidagi titleli
+	//path bu unga ob boruvchi yol
+	//path routesdagi path bilan bir-xil bolishi shart
+
 	const menusByRole = {
 		mentor: [
 			{ icon: LayoutGrid, label: 'Dashboard', path: '/mentor/' },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { setCredentials } from '../redux/authSlice'
 import axios from 'axios'
@@ -6,8 +6,11 @@ import logo from '../assets/logo.png'
 import login from '../assets/login.png'
 import { ArrowRight, Eye, EyeClosed } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import AOS from 'aos'
+import 'aos/dist/aos.css'
 
 const LoginLayout = () => {
+	const [showLoginForm, setShowLoginForm] = useState(false)
 	const dispatch = useDispatch()
 	const navigate = useNavigate()
 	const [showPassword, setShowPassword] = useState(false)
@@ -15,6 +18,15 @@ const LoginLayout = () => {
 	const [password, setPassword] = useState('')
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
+
+	useEffect(() => {
+		AOS.init({ duration: 1000, once: true })
+
+		const timer = setTimeout(() => {
+			setShowLoginForm(true)
+		}, 2000)
+		return () => clearTimeout(timer)
+	}, [])
 
 	const handleLogin = async () => {
 		setLoading(true)
@@ -29,40 +41,49 @@ const LoginLayout = () => {
 			)
 
 			const { accessToken, refreshToken, user } = res.data
-
-			// Store in Redux (this will also save to localStorage)
 			dispatch(setCredentials({ user, accessToken, refreshToken }))
-
-			console.log('Login success ✅')
+			navigate('/')
 		} catch (err) {
 			setError('Invalid phone or password')
-			console.error(err)
 		}
 		setLoading(false)
-
-		navigate('/')
-
 	}
 
 	return (
-		<div className='flex items-center justify-center'>
-			{/* LEFT SIDE */}
-			<div className='w-[50%] bg-[#3F8CFF] h-[100vh] px-[94px] flex flex-col gap-[45px] items-start py-[60px]'>
+		<div className='w-screen h-screen relative overflow-hidden'>
+			{/* LEFT PANEL (Intro) */}
+			<div
+				className={`absolute inset-0 bg-[#3F8CFF] px-[94px] py-[60px] flex flex-col items-center gap-[30px] transition-opacity duration-1000 ${
+					showLoginForm ? 'opacity-0 pointer-events-none' : 'opacity-100'
+				}`}
+			>
 				<div className='flex flex-col gap-[50px] items-start'>
-					<div className='flex items-center gap-[30px]'>
+					<div className='flex items-center gap-[30px]' data-aos='fade-down'>
 						<img className='w-[50px]' src={logo} alt='logo' />
 						<p className='font-[700] text-[30px] text-white'>Woorkroom</p>
 					</div>
-					<h1 className='font-[700] text-[40px] text-white leading-[56px]'>
+					<h1
+						className='font-[700] text-[40px] text-white leading-[56px]'
+						data-aos='zoom-in'
+					>
 						Your place to work <br /> Plan. Create. Control.
 					</h1>
 				</div>
-				<img className='w-[500px] h-[373px]' src={login} alt='login visual' />
+				<img
+					className='w-[500px] h-[373px]'
+					src={login}
+					alt='login visual'
+					data-aos='fade-up'
+				/>
 			</div>
 
-			{/* RIGHT SIDE */}
-			<div className='w-[50%] px-[139px] flex flex-col gap-[49px]'>
-				<div className='flex flex-col gap-[33px] w-[100%]'>
+			{/* RIGHT PANEL (Login Form) */}
+			<div
+				className={`absolute inset-0 px-[139px] flex flex-col justify-center items-center transition-opacity duration-1000 ${
+					showLoginForm ? 'opacity-100' : 'opacity-0 pointer-events-none'
+				}`}
+			>
+				<div className='flex flex-col gap-[33px] w-[40%] z-[2]'>
 					<h2 className='text-center text-[#0A1629] text-[25px] font-[700]'>
 						Sign In to Woorkroom
 					</h2>
@@ -112,19 +133,19 @@ const LoginLayout = () => {
 						</div>
 
 						{error && <p className='text-red-500'>{error}</p>}
-					</form>
-				</div>
 
-				{/* Submit Button */}
-				<div className='flex justify-center w-[100%]'>
-					<button
-						onClick={handleLogin}
-						className='bg-[#3F8CFF] w-[38%] flex items-center justify-center gap-[7px] h-[48px] rounded-[14px] text-white'
-						disabled={loading}
-					>
-						{loading ? 'Loading...' : 'Sign In'}
-						<ArrowRight size={16} />
-					</button>
+						{/* Submit Button */}
+						<div className='flex justify-center w-full'>
+							<button
+								onClick={handleLogin}
+								className='bg-[#3F8CFF] w-[50%] flex items-center justify-center gap-[7px] h-[48px] rounded-[14px] text-white'
+								disabled={loading}
+							>
+								{loading ? 'Loading...' : 'Sign In'}
+								<ArrowRight size={16} />
+							</button>
+						</div>
+					</form>
 				</div>
 			</div>
 		</div>

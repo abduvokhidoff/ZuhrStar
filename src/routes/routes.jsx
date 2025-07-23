@@ -43,6 +43,10 @@ import MentorSozlamalar from '../pages/Mentor/Sozlamalar'
 import SupportMentorDashboard from '../pages/SupportMentor/Dashboard'
 import SupportMentorDarslar from '../pages/SupportMentor/QoshimchaDarslar'
 
+//Nomlari bir xil bob qomasin
+//Asideda elemnt qoshilib path berilgan bolishi shart
+
+
 const routes = createBrowserRouter([
 	{
 		path: '/login',

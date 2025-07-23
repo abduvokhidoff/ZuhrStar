@@ -1,8 +1,10 @@
-import React from 'react'
+
 
 const Guruhlar = () => {
   return (
-    <div>Guruhlar</div>
+    <div>
+      
+    </div>
   )
 }
 
