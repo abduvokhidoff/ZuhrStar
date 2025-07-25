@@ -1,10 +1,8 @@
-
+import React from 'react'
 
 const Guruhlar = () => {
   return (
-    <div>
-      
-    </div>
+    <div>Guruhlar</div>
   )
 }
 

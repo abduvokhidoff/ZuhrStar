@@ -2,7 +2,7 @@ import React from 'react'
 
 const Bildirishnomalar = () => {
   return (
-    <div>Bildirishnomalar</div>
+    <div className='fled'>Bildirishnomalar</div>
   )
 }
 

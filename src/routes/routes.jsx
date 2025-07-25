@@ -57,7 +57,7 @@ const routes = createBrowserRouter([
 		element: <PrivateRoute />,
 	},
 	{
-		path: '/super-admin',
+		path: '/super-admin/',
 		element: <SuperAdminLayout />,
 		children: [
 			{
@@ -99,7 +99,7 @@ const routes = createBrowserRouter([
 		],
 	},
 	{
-		path: '/admin',
+		path: '/admin/',
 		element: <AdminLayout />,
 		children: [
 			{
@@ -141,7 +141,7 @@ const routes = createBrowserRouter([
 		],
 	},
 	{
-		path: '/head-mentor',
+		path: '/head-mentor/',
 		element: <HeadMentorLayout />,
 		children: [
 			{
@@ -175,7 +175,7 @@ const routes = createBrowserRouter([
 		],
 	},
 	{
-		path: '/mentor',
+		path: '/mentor/',
 		element: <MentorLayout />,
 		children: [
 			{
@@ -201,7 +201,7 @@ const routes = createBrowserRouter([
 		],
 	},
 	{
-		path: '/support-mentor',
+		path: '/support-mentor/',
 		element: <SupportMentorLayout />,
 		children: [
 			{

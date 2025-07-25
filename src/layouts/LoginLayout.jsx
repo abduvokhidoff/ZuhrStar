@@ -43,7 +43,7 @@ const LoginLayout = () => {
 			const { accessToken, refreshToken, user } = res.data
 			dispatch(setCredentials({ user, accessToken, refreshToken }))
 			navigate('/')
-		} catch (err) {
+		} catch (error) {
 			setError('Invalid phone or password')
 		}
 		setLoading(false)
