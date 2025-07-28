@@ -39,6 +39,7 @@ import MentorOquvchilar from '../pages/Mentor/Oquvchilar'
 import MentorKurslar from '../pages/Mentor/Kurslar'
 import MentorGuruhlar from '../pages/Mentor/Guruhlar'
 import MentorSozlamalar from '../pages/Mentor/Sozlamalar'
+import MentorGoogleMeet from '../pages/Mentor/GoogleMeet'
 
 import SupportMentorDashboard from '../pages/SupportMentor/Dashboard'
 import SupportMentorDarslar from '../pages/SupportMentor/QoshimchaDarslar'
@@ -180,7 +181,7 @@ const routes = createBrowserRouter([
 		children: [
 			{
 				index: true,
-				element: <MentorDashboard/>,
+				element: <MentorDashboard />,
 			},
 			{
 				path: `/mentor/o'quvchilar`,
@@ -188,16 +189,20 @@ const routes = createBrowserRouter([
 			},
 			{
 				path: `/mentor/kurslar`,
-				element: <MentorKurslar/>,
+				element: <MentorKurslar />,
 			},
 			{
 				path: `/mentor/guruhlar`,
-				element: <MentorGuruhlar/>,
+				element: <MentorGuruhlar />,
 			},
 			{
 				path: `/mentor/sozlamalar`,
 				element: <MentorSozlamalar />,
-			}
+			},
+			{
+				path: `/mentor/google-meet`,
+				element: <MentorGoogleMeet />,
+			},
 		],
 	},
 	{
@@ -205,15 +210,14 @@ const routes = createBrowserRouter([
 		element: <SupportMentorLayout />,
 		children: [
 			{
-				index: true, 
-				element: <SupportMentorDashboard/>
-			}, 
+				index: true,
+				element: <SupportMentorDashboard />,
+			},
 			{
 				path: '/support-mentor/darslar',
-				element: <SupportMentorDarslar/>
-			}
-
-		]
+				element: <SupportMentorDarslar />,
+			},
+		],
 	},
 ])
 

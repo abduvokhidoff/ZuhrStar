@@ -9,7 +9,7 @@ const HeadMentorLayout = () => {
 			<div>
 				<Aside />
 			</div>
-			<div className='ml-[207px] w-full flex flex-col '>
+			<div className='ml-[207px] w-full flex flex-col bg-[#f3f9fe] min-h-[100vh]'>
 				<Navbar />
 				<Outlet />
 			</div>

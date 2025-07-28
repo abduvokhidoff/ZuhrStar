@@ -11,6 +11,8 @@ const Guruhlar = () => {
 	const [groups, setGroups] = useState([])
 	const [search, setSearch] = useState('')
 
+	
+
 	// Fetch all groups with refresh logic
 	const fetchGroups = async token => {
 		try {
@@ -69,9 +71,10 @@ const Guruhlar = () => {
 	const filteredGroups = groups.filter(group =>
 		group.name?.toLowerCase().includes(search.toLowerCase())
 	)
+	console.log(groups)
 
 	return (
-		<div className='min-h-[91vh] bg-[#f3f9fe] px-[30px] py-[50px] flex flex-col gap-[50px]'>
+		<div className=' px-[30px] py-[50px] flex flex-col gap-[50px]'>
 			{/* Header */}
 			<div className='flex justify-between items-center'>
 				<h1 className='text-[36px] font-[Nunito Sans] text-[#0A1629]'>
