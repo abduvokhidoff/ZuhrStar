@@ -6,6 +6,7 @@ import MentorLayout from '../layouts/MentorLayout'
 import PrivateRoute from '../components/PrivateRoute'
 import HeadMentorLayout from '../layouts/HeadMentorLayout'
 import SupportMentorLayout from '../layouts/SupportMentorLayout'
+
 import HeadMentorDashboard from '../pages/HeadMentor/Dashboard'
 import HeadMentorOquvchilar from '../pages/HeadMentor/Oquvchilar'
 import HeadMentorKurslar from '../pages/HeadMentor/Kurslar'
@@ -13,6 +14,10 @@ import HeadMentorMentorlar from '../pages/HeadMentor/Mentorlar'
 import HeadMentorGuruhlar from '../pages/HeadMentor/Guruhlar'
 import HeadMentorHisobotlar from '../pages/HeadMentor/Hisobotlar'
 import HeadMentorSozlamalar from '../pages/HeadMentor/Sozlamalar'
+import HeadMentorJadval from '../pages/HeadMentor/JadvalniKorish'
+import HeadMentorTest from '../pages/HeadMentor/TestNatija'
+import HeadMentorMaterial from '../pages/HeadMentor/OquvMaterial'
+
 
 import AdminDashboard from '../pages/Admin/Dashboard'
 import AdminOquvchilar from '../pages/Admin/Oquvchilar'
@@ -162,12 +167,24 @@ const routes = createBrowserRouter([
 				element: <HeadMentorMentorlar />,
 			},
 			{
+				path: `/head-mentor/material`,
+				element: <HeadMentorMaterial />,
+			},
+			{
 				path: `/head-mentor/guruhlar`,
 				element: <HeadMentorGuruhlar />,
 			},
 			{
+				path: `/head-mentor/jadval`,
+				element: <HeadMentorJadval />,
+			},
+			{
 				path: `/head-mentor/hisobotlar`,
 				element: <HeadMentorHisobotlar />,
+			},
+			{
+				path: `/head-mentor/test`,
+				element: <HeadMentorTest />,
 			},
 			{
 				path: `/head-mentor/sozlamalar`,

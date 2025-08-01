@@ -9,6 +9,8 @@ import {
 	Folder,
 	UserRound,
 	Video,
+	TestTube,
+	Users,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import logo from '../assets/logo.png'
@@ -41,6 +43,9 @@ const Aside = () => {
 			{ icon: Layers, label: 'Oquvchilar', path: `/head-mentor/o'quvchilar` },
 			{ icon: Calendar, label: 'Kurslar', path: `/head-mentor/kurslar` },
 			{ icon: Plane, label: 'Mentorlar', path: '/head-mentor/mentorlar' },
+			{ icon: Calendar, label: 'Jadval', path: '/head-mentor/jadval' },
+			{ icon: TestTube, label: 'Test Javoblar', path: '/head-mentor/test' },
+			{ icon: Layers, label: 'Materiallar', path: '/head-mentor/material' },
 			{
 				icon: MessagesSquare,
 				label: 'Guruhlar',

@@ -121,7 +121,7 @@ const Guruhlar = () => {
 							</div>
 							<div className='flex items-center gap-[10px]'>
 								<User size={16} className='text-[#348cff]' />
-								<span>Teacher: {group.teacher_phone}</span>
+								<span>Teacher: {group.teacher_fullNrisame}</span>
 							</div>
 							<div className='flex items-center gap-[10px]'>
 								<MapPin size={16} className='text-[#348cff]' />
