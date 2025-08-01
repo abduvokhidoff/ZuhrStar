@@ -161,7 +161,7 @@ const Dashboard = () => {
   const CustomTooltipBar = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+        <div className=" p-3 border rounded-lg shadow-lg">
           <p className="text-sm font-medium text-gray-700">{`Kun ${label}`}</p>
           {payload.map((entry, index) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
@@ -176,7 +176,7 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className='bg-gray-50 min-h-screen p-6'>
+      <div className='min-h-screen p-6'>
         <div className="animate-pulse">
           <div className="grid grid-cols-4 gap-6 mb-6">
             {[...Array(4)].map((_, i) => (
@@ -214,7 +214,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className='bg-gray-50 min-h-screen p-6'>
+    <div className=' min-h-screen p-6'>
       {/* Header */}
       <div className='flex justify-between items-end mb-12'>
         <div className='flex flex-col justify-center items-start'>
