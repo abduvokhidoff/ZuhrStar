@@ -1,9 +1,9 @@
 import { createBrowserRouter } from 'react-router-dom'
+import RoleBasedRoute from '../components/RoleBasedRoute'
 import LoginLayout from '../layouts/LoginLayout'
 import SuperAdminLayout from '../layouts/SuperAdminLayout'
 import AdminLayout from '../layouts/AdminLayout'
 import MentorLayout from '../layouts/MentorLayout'
-import PrivateRoute from '../components/PrivateRoute'
 import HeadMentorLayout from '../layouts/HeadMentorLayout'
 import SupportMentorLayout from '../layouts/SupportMentorLayout'
 
@@ -17,7 +17,6 @@ import HeadMentorSozlamalar from '../pages/HeadMentor/Sozlamalar'
 import HeadMentorJadval from '../pages/HeadMentor/JadvalniKorish'
 import HeadMentorTest from '../pages/HeadMentor/TestNatija'
 import HeadMentorMaterial from '../pages/HeadMentor/OquvMaterial'
-
 
 import AdminDashboard from '../pages/Admin/Dashboard'
 import AdminOquvchilar from '../pages/Admin/Oquvchilar'
@@ -49,190 +48,115 @@ import MentorGoogleMeet from '../pages/Mentor/GoogleMeet'
 import SupportMentorDashboard from '../pages/SupportMentor/Dashboard'
 import SupportMentorDarslar from '../pages/SupportMentor/QoshimchaDarslar'
 
-//Nomlari bir xil bob qomasin
-//Asideda elemnt qoshilib path berilgan bolishi shart
-
-
 const routes = createBrowserRouter([
 	{
 		path: '/login',
 		element: <LoginLayout />,
 	},
+
+	// Root route: foydalanuvchi roliga qarab redirect bo'ladi
 	{
 		path: '/',
-		element: <PrivateRoute />,
+		element: <RoleBasedRoute />,
 	},
+
+	// Superadmin
 	{
-		path: '/super-admin/',
-		element: <SuperAdminLayout />,
+		element: <RoleBasedRoute allowedRoles={['superadmin']} />,
 		children: [
 			{
-				index: true,
-				element: <SuperAdminDashboard />,
-			},
-			{
-				path: `/super-admin/students`,
-				element: <SuperAdminStudents />,
-			},
-			{
-				path: `/super-admin/calendar`,
-				element: <SuperAdminCalendar />,
-			},
-			{
-				path: `/super-admin/finance`,
-				element: <SuperAdminFinance />,
-			},
-			{
-				path: `/super-admin/employees`,
-				element: <SuperAdminEmployees />,
-			},
-			{
-				path: `/super-admin/marketing`,
-				element: <SuperAdminMarketing />,
-			},
-			{
-				path: `/super-admin/groups`,
-				element: <SuperAdminGroups />,
-			},
-			{
-				path: `/super-admin/problems`,
-				element: <SuperAdminProblems />,
-			},
-			{
-				path: `/super-admin/sozlamalar`,
-				element: <SuperAdminSozlamalar />,
+				path: '/super-admin/',
+				element: <SuperAdminLayout />,
+				children: [
+					{ index: true, element: <SuperAdminDashboard /> },
+					{ path: 'students', element: <SuperAdminStudents /> },
+					{ path: 'calendar', element: <SuperAdminCalendar /> },
+					{ path: 'finance', element: <SuperAdminFinance /> },
+					{ path: 'employees', element: <SuperAdminEmployees /> },
+					{ path: 'marketing', element: <SuperAdminMarketing /> },
+					{ path: 'groups', element: <SuperAdminGroups /> },
+					{ path: 'problems', element: <SuperAdminProblems /> },
+					{ path: 'sozlamalar', element: <SuperAdminSozlamalar /> },
+				],
 			},
 		],
 	},
+
+	// Admin
 	{
-		path: '/admin/',
-		element: <AdminLayout />,
+		element: <RoleBasedRoute allowedRoles={['admin']} />,
 		children: [
 			{
-				index: true,
-				element: <AdminDashboard />,
-			},
-			{
-				path: `/admin/o'quvchilar`,
-				element: <AdminOquvchilar />,
-			},
-			{
-				path: `/admin/kurslar`,
-				element: <AdminKurslar />,
-			},
-			{
-				path: `/admin/mentorlar`,
-				element: <AdminMentorlar />,
-			},
-			{
-				path: `/admin/to'lovlar`,
-				element: <AdminTolovlar />,
-			},
-			{
-				path: `/admin/guruhlar`,
-				element: <AdminGuruhlar />,
-			},
-			{
-				path: `/admin/google-meet`,
-				element: <AdminGoogleMeet />,
-			},
-			{
-				path: `/admin/bildirishnomalar`,
-				element: <AdminBildirishnomalar />,
-			},
-			{
-				path: `/admin/sozlamalar`,
-				element: <AdminSozlamalar />,
+				path: '/admin/',
+				element: <AdminLayout />,
+				children: [
+					{ index: true, element: <AdminDashboard /> },
+					{ path: "o'quvchilar", element: <AdminOquvchilar /> },
+					{ path: 'kurslar', element: <AdminKurslar /> },
+					{ path: 'mentorlar', element: <AdminMentorlar /> },
+					{ path: "to'lovlar", element: <AdminTolovlar /> },
+					{ path: 'guruhlar', element: <AdminGuruhlar /> },
+					{ path: 'google-meet', element: <AdminGoogleMeet /> },
+					{ path: 'bildirishnomalar', element: <AdminBildirishnomalar /> },
+					{ path: 'sozlamalar', element: <AdminSozlamalar /> },
+				],
 			},
 		],
 	},
+
+	// Head Mentor
 	{
-		path: '/head-mentor/',
-		element: <HeadMentorLayout />,
+		element: <RoleBasedRoute allowedRoles={['headmentor']} />,
 		children: [
 			{
-				index: true,
-				element: <HeadMentorDashboard />,
-			},
-			{
-				path: `/head-mentor/o'quvchilar`,
-				element: <HeadMentorOquvchilar />,
-			},
-			{
-				path: `/head-mentor/kurslar`,
-				element: <HeadMentorKurslar />,
-			},
-			{
-				path: `/head-mentor/mentorlar`,
-				element: <HeadMentorMentorlar />,
-			},
-			{
-				path: `/head-mentor/material`,
-				element: <HeadMentorMaterial />,
-			},
-			{
-				path: `/head-mentor/guruhlar`,
-				element: <HeadMentorGuruhlar />,
-			},
-			{
-				path: `/head-mentor/jadval`,
-				element: <HeadMentorJadval />,
-			},
-			{
-				path: `/head-mentor/hisobotlar`,
-				element: <HeadMentorHisobotlar />,
-			},
-			{
-				path: `/head-mentor/test`,
-				element: <HeadMentorTest />,
-			},
-			{
-				path: `/head-mentor/sozlamalar`,
-				element: <HeadMentorSozlamalar />,
+				path: '/head-mentor/',
+				element: <HeadMentorLayout />,
+				children: [
+					{ index: true, element: <HeadMentorDashboard /> },
+					{ path: "o'quvchilar", element: <HeadMentorOquvchilar /> },
+					{ path: 'kurslar', element: <HeadMentorKurslar /> },
+					{ path: 'mentorlar', element: <HeadMentorMentorlar /> },
+					{ path: 'material', element: <HeadMentorMaterial /> },
+					{ path: 'guruhlar', element: <HeadMentorGuruhlar /> },
+					{ path: 'jadval', element: <HeadMentorJadval /> },
+					{ path: 'hisobotlar', element: <HeadMentorHisobotlar /> },
+					{ path: 'test', element: <HeadMentorTest /> },
+					{ path: 'sozlamalar', element: <HeadMentorSozlamalar /> },
+				],
 			},
 		],
 	},
+
+	// Mentor
 	{
-		path: '/mentor/',
-		element: <MentorLayout />,
+		element: <RoleBasedRoute allowedRoles={['mentor']} />,
 		children: [
 			{
-				index: true,
-				element: <MentorDashboard />,
-			},
-			{
-				path: `/mentor/o'quvchilar`,
-				element: <MentorOquvchilar />,
-			},
-			{
-				path: `/mentor/kurslar`,
-				element: <MentorKurslar />,
-			},
-			{
-				path: `/mentor/guruhlar`,
-				element: <MentorGuruhlar />,
-			},
-			{
-				path: `/mentor/sozlamalar`,
-				element: <MentorSozlamalar />,
-			},
-			{
-				path: `/mentor/google-meet`,
-				element: <MentorGoogleMeet />,
+				path: '/mentor/',
+				element: <MentorLayout />,
+				children: [
+					{ index: true, element: <MentorDashboard /> },
+					{ path: "o'quvchilar", element: <MentorOquvchilar /> },
+					{ path: 'kurslar', element: <MentorKurslar /> },
+					{ path: 'guruhlar', element: <MentorGuruhlar /> },
+					{ path: 'sozlamalar', element: <MentorSozlamalar /> },
+					{ path: 'google-meet', element: <MentorGoogleMeet /> },
+				],
 			},
 		],
 	},
+
+	// Support Mentor
 	{
-		path: '/support-mentor/',
-		element: <SupportMentorLayout />,
+		element: <RoleBasedRoute allowedRoles={['supportteacher']} />,
 		children: [
 			{
-				index: true,
-				element: <SupportMentorDashboard />,
-			},
-			{
-				path: '/support-mentor/darslar',
-				element: <SupportMentorDarslar />,
+				path: '/support-mentor/',
+				element: <SupportMentorLayout />,
+				children: [
+					{ index: true, element: <SupportMentorDashboard /> },
+					{ path: 'darslar', element: <SupportMentorDarslar /> },
+				],
 			},
 		],
 	},
