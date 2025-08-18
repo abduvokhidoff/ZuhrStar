@@ -18,10 +18,11 @@ import {
   User,
   Headphones,
   X,
-  Save
+  Save,
+  Loader
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
-import { logout, setCredentials } from '../../redux/authSlice'; // Update with your correct path
+import { logout, setCredentials } from '../../redux/authSlice';
 
 const Kurslar = () => {
   const [activeTab, setActiveTab] = useState('kurslar');
@@ -336,7 +337,12 @@ const Kurslar = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <h2 className="text-2xl font-bold text-gray-800">Kurslar</h2>
-              {loading && <div className="text-blue-600">Yuklanmoqda...</div>}
+              {loading && (
+                <div className="flex items-center text-blue-600">
+                  <Loader className="w-4 h-4 animate-spin mr-2" />
+                  Yuklanmoqda...
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               <button
@@ -454,7 +460,14 @@ const Kurslar = () => {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   disabled={loading}
                 >
-                  {loading ? 'Qo\'shilmoqda...' : 'Qo\'shish'}
+                  {loading ? (
+                    <span className="flex items-center">
+                      <Loader className="w-4 h-4 animate-spin mr-2" />
+                      Qo'shilmoqda...
+                    </span>
+                  ) : (
+                    'Qo\'shish'
+                  )}
                 </button>
               </div>
             </div>
@@ -483,192 +496,203 @@ const Kurslar = () => {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kurs nomi</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Davomiyligi</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Guruhlar soni</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Narxi</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harakatlar</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredKurslar.map((kurs) => (
-                    <React.Fragment key={kurs.name}>
-                      <tr key={kurs.name} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{kurs.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {editingId === kurs.name ? (
-                            <input
-                              type="text"
-                              value={editForm.name || ''}
-                              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                            />
-                          ) : (
-                            kurs.name
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {editingId === kurs.name ? (
-                            <div className="flex items-center space-x-1">
-                              <input
-                                type="number"
-                                value={editForm.duration || ''}
-                                onChange={(e) => setEditForm({ ...editForm, duration: e.target.value })}
-                                className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                                min="1"
-                              />
-                              <select
-                                value={editForm.duration_type || 'month'}
-                                onChange={(e) => setEditForm({ ...editForm, duration_type: e.target.value })}
-                                className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                              >
-                                <option value="month">oy</option>
-                                <option value="week">hafta</option>
-                                <option value="day">kun</option>
-                              </select>
-                            </div>
-                          ) : (
-                            `${kurs.duration} ${kurs.duration_type || 'oy'}`
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            {editingId === kurs.name ? (
-                              <input
-                                type="number"
-                                value={editForm.groups_count || ''}
-                                onChange={(e) => setEditForm({ ...editForm, groups_count: e.target.value })}
-                                className="w-12 px-1 py-0.5 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-blue-500"
-                                min="0"
-                              />
-                            ) : (
-                              kurs.groups_count || 0
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {editingId === kurs.name ? (
-                            <input
-                              type="text"
-                              value={editForm.price || ''}
-                              onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                              className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                            />
-                          ) : (
-                            kurs.price
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            {editingId === kurs.name ? (
-                              <>
-                                <button
-                                  onClick={handleSave}
-                                  className="text-green-600 hover:text-green-800 disabled:opacity-50"
-                                  title="Saqlash"
-                                  disabled={loading}
-                                >
-                                  <Save className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={handleCancel}
-                                  className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                                  title="Bekor qilish"
-                                  disabled={loading}
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => handleView(kurs.name)}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="Ko'rish"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleEdit(kurs)}
-                                  className="text-yellow-600 hover:text-yellow-800 disabled:opacity-50"
-                                  title="Tahrirlash"
-                                  disabled={loading}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(kurs.name)}
-                                  className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                                  title="O'chirish"
-                                  disabled={loading}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
+          {/* Loading state for the table */}
+          {loading ? (
+            <div className="bg-white rounded-lg shadow-sm p-12">
+              <div className="flex flex-col items-center justify-center">
+                <Loader className="w-12 h-12 animate-spin text-blue-600 mb-4" />
+                <p className="text-gray-600 text-lg">Ma'lumotlar yuklanmoqda...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Table */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kurs nomi</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Davomiyligi</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Guruhlar soni</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Narxi</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harakatlar</th>
                       </tr>
-                      {/* Detailed View Row */}
-                      {viewingId === kurs.name && (
-                        <tr key={`detail-${kurs.name}`} className="bg-blue-50">
-                          <td colSpan="6" className="px-6 py-4">
-                            <div className="bg-white rounded-lg p-4 shadow-sm">
-                              <h4 className="font-semibold text-gray-800 mb-3">Kurs haqida batafsil ma'lumot</h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                  <span className="block text-sm font-medium text-gray-500">ID:</span>
-                                  <span className="text-sm text-gray-900">{kurs.name}</span>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredKurslar.map((kurs) => (
+                        <React.Fragment key={kurs.name}>
+                          <tr key={kurs.name} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{kurs.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {editingId === kurs.name ? (
+                                <input
+                                  type="text"
+                                  value={editForm.name || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                />
+                              ) : (
+                                kurs.name
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {editingId === kurs.name ? (
+                                <div className="flex items-center space-x-1">
+                                  <input
+                                    type="number"
+                                    value={editForm.duration || ''}
+                                    onChange={(e) => setEditForm({ ...editForm, duration: e.target.value })}
+                                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                    min="1"
+                                  />
+                                  <select
+                                    value={editForm.duration_type || 'month'}
+                                    onChange={(e) => setEditForm({ ...editForm, duration_type: e.target.value })}
+                                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="month">oy</option>
+                                    <option value="week">hafta</option>
+                                    <option value="day">kun</option>
+                                  </select>
                                 </div>
-                                <div>
-                                  <span className="block text-sm font-medium text-gray-500">Kurs nomi:</span>
-                                  <span className="text-sm text-gray-900">{kurs.name}</span>
-                                </div>
-                                <div>
-                                  <span className="block text-sm font-medium text-gray-500">Davomiyligi:</span>
-                                  <span className="text-sm text-gray-900">{kurs.duration} {kurs.duration_type || 'oy'}</span>
-                                </div>
-                                <div>
-                                  <span className="block text-sm font-medium text-gray-500">Guruhlar soni:</span>
-                                  <span className="text-sm text-gray-900">{kurs.groups_count || 0} ta</span>
-                                </div>
-                                <div>
-                                  <span className="block text-sm font-medium text-gray-500">Narxi:</span>
-                                  <span className="text-sm text-gray-900">{kurs.price}</span>
-                                </div>
+                              ) : (
+                                `${kurs.duration} ${kurs.duration_type || 'oy'}`
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {editingId === kurs.name ? (
+                                  <input
+                                    type="number"
+                                    value={editForm.groups_count || ''}
+                                    onChange={(e) => setEditForm({ ...editForm, groups_count: e.target.value })}
+                                    className="w-12 px-1 py-0.5 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-blue-500"
+                                    min="0"
+                                  />
+                                ) : (
+                                  kurs.groups_count || 0
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {editingId === kurs.name ? (
+                                <input
+                                  type="text"
+                                  value={editForm.price || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                                  className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                />
+                              ) : (
+                                kurs.price
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                {editingId === kurs.name ? (
+                                  <>
+                                    <button
+                                      onClick={handleSave}
+                                      className="text-green-600 hover:text-green-800 disabled:opacity-50"
+                                      title="Saqlash"
+                                      disabled={loading}
+                                    >
+                                      <Save className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={handleCancel}
+                                      className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                                      title="Bekor qilish"
+                                      disabled={loading}
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleView(kurs.name)}
+                                      className="text-blue-600 hover:text-blue-800"
+                                      title="Ko'rish"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleEdit(kurs)}
+                                      className="text-yellow-600 hover:text-yellow-800 disabled:opacity-50"
+                                      title="Tahrirlash"
+                                      disabled={loading}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(kurs.name)}
+                                      className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                                      title="O'chirish"
+                                      disabled={loading}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                            </td>
+                          </tr>
+                          {/* Detailed View Row */}
+                          {viewingId === kurs.name && (
+                            <tr key={`detail-${kurs.name}`} className="bg-blue-50">
+                              <td colSpan="6" className="px-6 py-4">
+                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                  <h4 className="font-semibold text-gray-800 mb-3">Kurs haqida batafsil ma'lumot</h4>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div>
+                                      <span className="block text-sm font-medium text-gray-500">ID:</span>
+                                      <span className="text-sm text-gray-900">{kurs.name}</span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-sm font-medium text-gray-500">Kurs nomi:</span>
+                                      <span className="text-sm text-gray-900">{kurs.name}</span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-sm font-medium text-gray-500">Davomiyligi:</span>
+                                      <span className="text-sm text-gray-900">{kurs.duration} {kurs.duration_type || 'oy'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-sm font-medium text-gray-500">Guruhlar soni:</span>
+                                      <span className="text-sm text-gray-900">{kurs.groups_count || 0} ta</span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-sm font-medium text-gray-500">Narxi:</span>
+                                      <span className="text-sm text-gray-900">{kurs.price}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          {/* Qidiruv natijalari */}
-          {searchTerm && (
-            <div className="mt-4 text-sm text-gray-600">
-              "{searchTerm}" bo'yicha {filteredKurslar.length} ta natija topildi
-            </div>
+              {/* Qidiruv natijalari */}
+              {searchTerm && (
+                <div className="mt-4 text-sm text-gray-600">
+                  "{searchTerm}" bo'yicha {filteredKurslar.length} ta natija topildi
+                </div>
+              )}
+
+              {/* Ma'lumot yo'q xabari */}
+              {kurslarData.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  Hozircha kurslar mavjud emas
+                </div>
+              )}
+            </>
           )}
-
-          {/* Ma'lumot yo'q xabari */}
-          {!loading && kurslarData.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              Hozircha kurslar mavjud emas
-            </div>
-          )}
-
         </div>
       </div>
     </div>

@@ -2,7 +2,9 @@ import React from 'react'
 
 const Sozlamalar = () => {
   return (
-    <div>Sozlamalar</div>
+    <div>
+      
+    </div>
   )
 }
 
