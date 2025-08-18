@@ -18,8 +18,8 @@ const Dashboard = () => {
   // Get token and user info from Redux store
   const { accessToken, user } = useSelector((state) => state.auth);
 
-  const mentorName = user?.name || user?.username || 'Mentor';
-  const role = user?.role || 'Mentor';
+  const mentorName = user?.name || user?.username || 'HeadMentor';
+  const role = user?.role || 'HeadMentor';
 
   useEffect(() => {
     // Check if token exists
@@ -491,39 +491,43 @@ const Dashboard = () => {
 
       {/* Groups Statistics */}
       <h2 className='text-2xl font-bold text-gray-900 mt-10 ml-2 mb-8'>Guruhlar statistikasi</h2>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-6">
         {groups.map((group, index) => (
-          <div key={index} className="relative w-full h-36 bg-white rounded-3xl flex justify-between items-center px-16 py-8">
-            <div className='flex justify-center items-start flex-col gap-6'>
-              <div className='flex justify-start items-center gap-7'>
-                <div className='w-12 bg-blue-800 rounded-lg h-12 flex items-center justify-center text-white font-bold'>
-                  G{index + 1}
+          <div key={index} className="w-full bg-white rounded-3xl p-8">
+            <div className="grid grid-cols-2 gap-12">
+              {/* Left Side - Group Info */}
+              <div className='flex flex-col gap-6'>
+                <div className='flex items-center gap-7'>
+                  <div className='w-12 bg-blue-800 rounded-lg h-12 flex items-center justify-center text-white font-bold'>
+                    G{index + 1}
+                  </div>
+                  <div className='flex flex-col gap-1'>
+                    <p className='text-gray-400 text-sm font-normal'>{group._id ? group._id.slice(-6).toUpperCase() : `GR000${index + 1}`}</p>
+                    <p className='text-lg font-bold'>{group.name || `Guruh ${index + 1}`}</p>
+                  </div>
                 </div>
-                <div className='flex flex-col justify-center items-start gap-1'>
-                  <p className='text-gray-400 text-sm font-normal'>{group._id ? group._id.slice(-6).toUpperCase() : `GR000${index + 1}`}</p>
-                  <p className='text-lg font-bold'>{group.name || `Guruh ${index + 1}`}</p>
+                <div className='flex gap-8 items-center'>
+                  <p className='text-sm font-semibold'>Yaratilgan: {group.createdAt ? new Date(group.createdAt).toLocaleDateString('uz-UZ') : 'Sep 12, 2020'}</p>
+                  <p className='text-sm font-bold text-yellow-500'>{group.level || 'Yuqori'}</p>
                 </div>
               </div>
-              <div className='flex justify-between gap-24 items-center'>
-                <p className='text-sm font-semibold'>Yaratilgan: {group.createdAt ? new Date(group.createdAt).toLocaleDateString('uz-UZ') : 'Sep 12, 2020'}</p>
-                <p className='text-sm font-bold text-yellow-500'>{group.level || 'Yuqori'}</p>
-              </div>
-            </div>
-            <div className="absolute h-36 w-0.5 bg-gray-200 left-1/2 -translate-x-1/2"></div>
-            <div className='flex flex-col mr-48 justify-center items-start gap-4'>
-              <p className='text-base font-bold text-gray-900'>Guruh ma'lumotlari</p>
-              <div className='flex justify-center items-center gap-16'>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">Jami o'quvchilar</p>
-                  <p className="text-lg font-bold">{group.students?.length || group.totalStudents || '12'}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">Faol</p>
-                  <p className="text-lg font-bold">{group.activeStudents || (group.students?.length ? Math.floor(group.students.length * 0.8) : '10')}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">To'xtatilgan</p>
-                  <p className="text-lg font-bold">{group.pausedStudents || (group.students?.length ? Math.floor(group.students.length * 0.2) : '2')}</p>
+
+              {/* Right Side - Group Statistics */}
+              <div className='flex flex-col gap-4'>
+                <p className='text-base font-bold text-gray-900'>Guruh ma'lumotlari</p>
+                <div className='grid grid-cols-3 gap-8'>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Jami o'quvchilar</p>
+                    <p className="text-lg font-bold">{group.students?.length || group.totalStudents || '12'}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Faol</p>
+                    <p className="text-lg font-bold">{group.activeStudents || (group.students?.length ? Math.floor(group.students.length * 0.8) : '10')}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">To'xtatilgan</p>
+                    <p className="text-lg font-bold">{group.pausedStudents || (group.students?.length ? Math.floor(group.students.length * 0.2) : '2')}</p>
+                  </div>
                 </div>
               </div>
             </div>
