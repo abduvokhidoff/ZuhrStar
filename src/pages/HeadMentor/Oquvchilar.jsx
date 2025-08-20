@@ -280,7 +280,7 @@ const Oquvchilar = () => {
           type: "error",
         });
         dispatch(logout());
-        navigate("/login");
+        navigate("/");
         return;
       }
 

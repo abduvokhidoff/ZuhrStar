@@ -197,7 +197,7 @@ const Kurslar = () => {
       } else {
         const errorText = await response.text();
         console.error('Kurs qo\'shishda xatolik:', response.status, errorText);
-        alert(`Kurs qo\'shishda xatolik: ${response.status} - ${errorText}`);
+        alert(`Kurs qo'shishda xatolik: ${response.status} - ${errorText}`);
       }
     } catch (error) {
       console.error('Kurs qo\'shishda xatolik:', error);
@@ -284,7 +284,7 @@ const Kurslar = () => {
           const errorData = await response.json().catch(() => null);
           const errorMessage = errorData?.message || await response.text();
           console.error('Kursni o\'chirishda xatolik:', response.status, errorMessage);
-          alert(`Kursni o\'chirishda xatolik: ${errorMessage || response.status}`);
+          alert(`Kursni o'chirishda xatolik: ${errorMessage || response.status}`);
         }
       } catch (error) {
         console.error('Kursni o\'chirishda xatolik:', error);
@@ -337,12 +337,6 @@ const Kurslar = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <h2 className="text-2xl font-bold text-gray-800">Kurslar</h2>
-              {loading && (
-                <div className="flex items-center text-blue-600">
-                  <Loader className="w-4 h-4 animate-spin mr-2" />
-                  Yuklanmoqda...
-                </div>
-              )}
             </div>
             <div className="flex items-center space-x-4">
               <button
@@ -500,8 +494,7 @@ const Kurslar = () => {
           {loading ? (
             <div className="bg-white rounded-lg shadow-sm p-12">
               <div className="flex flex-col items-center justify-center">
-                <Loader className="w-12 h-12 animate-spin text-blue-600 mb-4" />
-                <p className="text-gray-600 text-lg">Ma'lumotlar yuklanmoqda...</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
               </div>
             </div>
           ) : (

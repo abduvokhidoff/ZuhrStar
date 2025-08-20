@@ -176,24 +176,10 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className='min-h-screen p-6'>
-        <div className="animate-pulse">
-          <div className="grid grid-cols-4 gap-6 mb-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white w-full h-36 rounded-lg p-6">
-                <div className="h-4 bg-gray-200 rounded mb-4"></div>
-                <div className="h-8 bg-gray-200 rounded mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-20"></div>
-              </div>
-            ))}
-          </div>
-          <div className="bg-white h-96 rounded-lg mb-6"></div>
-          <div className="flex gap-6">
-            <div className="bg-white w-full h-64 rounded-lg"></div>
-          </div>
-        </div>
-      </div>
-    );
+			<div className='flex items-center justify-center h-screen'>
+				<div className='animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent'></div>
+			</div>
+		)
   }
 
   if (error) {
@@ -438,7 +424,7 @@ const Dashboard = () => {
             <p className='text-2xl font-bold'>O'quvchilar</p>
             <a href="#" className='text-base font-semibold text-blue-500'>Barchasini ko'rish &gt;</a>
           </div>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="flex items-center justify-between">
             {students.slice(0, 8).map((student, index) => (
               <div key={index} className="bg-blue-50 px-8 rounded-3xl py-4 flex justify-center text-center items-center flex-col w-44 h-44">
                 <div className='w-12 h-12 bg-blue-500 rounded-full mb-4 flex items-center justify-center text-white font-bold'>
