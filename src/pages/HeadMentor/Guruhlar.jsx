@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { setCredentials } from '../../redux/authSlice'
-import { Clock, Code, Search, MapPin, Book, User, X } from 'lucide-react'
+import { Clock, Code, Search, MapPin, Book, User, X, Users } from 'lucide-react'
 
 const Guruhlar = () => {
 	const dispatch = useDispatch()
@@ -135,12 +135,7 @@ const Guruhlar = () => {
 					{/* Modal Content */}
 					<div className='relative bg-white rounded-2xl shadow-lg w-[600px] max-h-[90vh] overflow-y-auto p-6 z-10 animate-fadeIn'>
 						{/* Close Button */}
-						<button
-							className='absolute top-4 right-4 text-gray-500 hover:text-gray-700'
-							onClick={() => setSelectedGroup(null)}
-						>
 						
-						</button>
 
 						{/* Modal Header */}
 						<div className='flex justify-between items-center'>
@@ -168,6 +163,27 @@ const Guruhlar = () => {
 								<User size={18} className='text-[#348cff]' />
 								<span>O'qituvchi: {selectedGroup.teacher_fullName}</span>
 							</div>
+
+							{/* Students */}
+							<div className='flex items-start gap-2'>
+								<Users size={18} className='text-[#348cff] mt-1' />
+								<div className='flex flex-col'>
+									<span>O'quvchilar:</span>
+									<div className='ml-2 mt-1 flex flex-col gap-1'>
+										{selectedGroup.students &&
+										selectedGroup.students.length > 0 ? (
+											selectedGroup.students.map((student, idx) => (
+												<p key={idx} className='text-gray-700 text-sm'>
+													{student.fullName}
+												</p>
+											))
+										) : (
+											<p className='text-gray-500 text-sm'>Hozircha o'quvchilar yo‘q</p>
+										)}
+									</div>
+								</div>
+							</div>
+
 							<div className='flex items-center gap-2'>
 								<MapPin size={18} className='text-[#348cff]' />
 								<span>Filial: {selectedGroup.branch}</span>
