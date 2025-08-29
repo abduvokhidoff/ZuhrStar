@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, createHashRouter } from 'react-router-dom'
 import RoleBasedRoute from '../components/RoleBasedRoute'
 import LoginLayout from '../layouts/LoginLayout'
 import SuperAdminLayout from '../layouts/SuperAdminLayout'
@@ -48,7 +48,7 @@ import MentorGoogleMeet from '../pages/Mentor/GoogleMeet'
 import SupportMentorDashboard from '../pages/SupportMentor/Dashboard'
 import SupportMentorDarslar from '../pages/SupportMentor/QoshimchaDarslar'
 
-const routes = createBrowserRouter([
+const routes = createHashRouter([
 	{
 		path: '/login',
 		element: <LoginLayout />,
