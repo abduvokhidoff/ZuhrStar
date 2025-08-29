@@ -21,17 +21,14 @@ const Dashboard = () => {
 	const [lessons, setLessons] = useState([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState(null)
-  const navigate = useNavigate()
+	const navigate = useNavigate()
 
-
-	// Get token and user info from Redux store
 	const { accessToken, user } = useSelector(state => state.auth)
 
 	const mentorName = user?.name || user?.username || 'HeadMentor'
 	const role = user?.role || 'HeadMentor'
 
 	useEffect(() => {
-		// Check if token exists
 		if (!accessToken) {
 			setError('Tizimga kirishingiz kerak')
 			setLoading(false)
@@ -57,14 +54,14 @@ const Dashboard = () => {
 				}
 
 				const data = await Promise.all(
-					responses.map(async (res, i) =>
+					responses.map(async res =>
 						res.status === 404 ? [] : await res.json()
 					)
 				)
 
-				// ✅ LIMIT STUDENTS TO MAX 3
-				setStudents(Array.isArray(data[0]) ? data[0].slice(0, 3) : [])
-				setGroups(data[1].reverse()) // Guruhlarni teskari tartibda o'rnatish
+				// store ALL students; limits only in render
+				setStudents(Array.isArray(data[0]) ? data[0] : [])
+				setGroups(data[1].reverse())
 				setAttendance(data[2])
 				setLessons(Array.isArray(data[3]) ? data[3] : [])
 				setLoading(false)
@@ -83,7 +80,7 @@ const Dashboard = () => {
 	const weekday = today.getDay()
 	const isOdd = day % 2 === 1
 
-	// Guruhlardan darslar yaratish
+	// Synthetic lessons from groups
 	const groupLessons = groups.map((group, index) => {
 		const times = ['09:00', '11:00', '14:00', '16:00']
 		const durations = ['1s', '1.5s', '2s', '1s']
@@ -96,11 +93,10 @@ const Dashboard = () => {
 		}
 	})
 
-	// Kun turi bo'yicha darslarni filtrlash
 	const filteredLessons = groupLessons.filter(lesson => {
-		if (weekday === 0) return lesson.dayType === 0 // Yakshanba
-		if (isOdd) return lesson.dayType === 1 // Toq kun
-		return lesson.dayType === 2 // Juft kun
+		if (weekday === 0) return lesson.dayType === 0
+		if (isOdd) return lesson.dayType === 1
+		return lesson.dayType === 2
 	})
 
 	const getEndTime = startTime => {
@@ -131,35 +127,10 @@ const Dashboard = () => {
 		advanced: Math.floor(item.students * 0.4),
 	}))
 
-	// Format functions
-	const formatValue = value => {
-		if (value >= 1000000) {
-			return (value / 1000000).toFixed(0) + ' 000 000'
-		} else if (value >= 1000) {
-			return Math.floor(value / 1000) + ' 000'
-		}
-		return value.toString()
-	}
-
-	const formatValueShort = value => {
-		if (value >= 1000000) {
-			return (value / 1000000).toFixed(1) + 'M'
-		}
-		if (value >= 1000) {
-			return (value / 1000).toFixed(0) + 'k'
-		}
-		return value.toString()
-	}
-
-	const formatNumber = num => {
-		return new Intl.NumberFormat('en-US').format(num)
-	}
-
-	// Custom tooltips
 	const CustomTooltipArea = ({ active, payload, label }) => {
 		if (active && payload && payload.length) {
 			return (
-				<div className='bg-white p-3 border border-gray-200 rounded-lg shadow-lg'>
+				<div className=' p-3 border rounded-lg shadow-lg'>
 					<p className='text-sm font-medium text-gray-700'>{`Kun ${label}`}</p>
 					{payload.map((entry, index) => (
 						<p key={index} className='text-sm' style={{ color: entry.color }}>
@@ -432,7 +403,12 @@ const Dashboard = () => {
 								axisLine={false}
 								tickLine={false}
 								tick={{ fontSize: 12, fill: '#9CA3AF' }}
-								tickFormatter={formatValueShort}
+								tickFormatter={value => {
+									if (value >= 1_000_000)
+										return (value / 1_000_000).toFixed(1) + 'M'
+									if (value >= 1_000) return (value / 1_000).toFixed(0) + 'k'
+									return value.toString()
+								}}
 							/>
 							<Tooltip content={<CustomTooltipBar />} />
 							<Bar
@@ -468,7 +444,7 @@ const Dashboard = () => {
 						</button>
 					</div>
 					<div className='flex items-center justify-between'>
-						{students.slice(0, 8).map((student, index) => (
+						{students.slice(0, 3).map((student, index) => (
 							<div
 								key={index}
 								className='bg-blue-50 px-8 rounded-3xl py-4 flex justify-center text-center items-center flex-col w-44 h-44'
@@ -494,9 +470,12 @@ const Dashboard = () => {
 				<div className='w-2/5 h-auto rounded-3xl bg-white p-8'>
 					<div className='flex justify-between items-center mb-6'>
 						<p className='text-2xl font-bold'>Darslar</p>
-						<a href='#' className='text-base font-semibold text-blue-500'>
+						<button
+							onClick={() => navigate('/head-mentor/jadval')}
+							className='text-base font-semibold text-blue-500'
+						>
 							Barchasini ko'rish &gt;
-						</a>
+						</button>
 					</div>
 					<div className='flex flex-col gap-8'>
 						{filteredLessons.slice(0, 3).map((lesson, index) => (

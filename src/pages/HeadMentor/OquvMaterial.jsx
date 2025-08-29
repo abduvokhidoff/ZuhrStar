@@ -162,34 +162,8 @@ const OquvMaterial = () => {
             O'quv Materiallari
           </h1>
           <p className="text-gray-600 text-lg">
-            {user ? `Salom, ${user.name || user.email}!` : 'Barcha kurslaringizni boshqaring va yangi mavzular qo\'shing'}
+            {user ? `Salom, ${user.fullName }!` : 'Barcha kurslaringizni boshqaring va yangi mavzular qo\'shing'}
           </p>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-white rounded-full p-1 shadow-lg border">
-            <button
-              onClick={() => setActiveTab('davomat')}
-              className={`px-6 py-3 rounded-full font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === 'davomat'
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-500'
-                }`}
-            >
-              <Calendar className="w-4 h-4" />
-              Davomat
-            </button>
-            <button
-              onClick={() => setActiveTab('vazifalar')}
-              className={`px-6 py-3 rounded-full font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === 'vazifalar'
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-500'
-                }`}
-            >
-              <Zap className="w-4 h-4" />
-              Vazifalar
-            </button>
-          </div>
         </div>
 
         {/* Error Message */}

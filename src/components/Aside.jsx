@@ -107,7 +107,7 @@ const Aside = () => {
 	return (
 		<aside className='w-[207px] bg-[#f8faff] h-screen px-[15px] py-[40px] flex flex-col items-start gap-[42px] fixed top-0 left-0 bg-[white]'>
 			<div>
-				<img src={logo} className='w-[50px]' alt='' />
+				<img src={logo} className='w-[130px]' alt='' />
 			</div>
 			<div className='gap-[15px] flex flex-col items-start w-[100%]'>
 				{menuItems.map((item, index) => {

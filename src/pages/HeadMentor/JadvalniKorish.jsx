@@ -32,6 +32,8 @@ const JadvalniKorish = () => {
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState(null)
 	const [isRefreshing, setIsRefreshing] = useState(false)
+	const [hoveredGroup, setHoveredGroup] = useState(null)
+	const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
 
 	// 1 soatlik time slotlar - 8:00 dan 20:00 gacha (ertalab 8 dan kech 8 gacha) + 20:00 ham qo'shildi
 	const timeSlots = Array.from({ length: 13 }, (_, i) => {
@@ -164,6 +166,7 @@ const JadvalniKorish = () => {
 			width,
 			border: '2px solid white',
 			boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+			group: group, // Gruppaning to'liq ma'lumotini saqlash
 		}
 	}
 
@@ -180,10 +183,43 @@ const JadvalniKorish = () => {
 		return ((totalMinutes - startMinutes) / (13 * 60)) * 100
 	}
 
+	const handleMouseEnter = (event, group) => {
+		setHoveredGroup(group)
+		setTooltipPosition({
+			x: event.clientX,
+			y: event.clientY,
+		})
+	}
+
+	const handleMouseLeave = () => {
+		setHoveredGroup(null)
+	}
+
+	const handleMouseMove = event => {
+		if (hoveredGroup) {
+			setTooltipPosition({
+				x: event.clientX,
+				y: event.clientY,
+			})
+		}
+	}
+
+	const getDaysList = days => {
+		if (!days) return 'Белгиланмаган'
+
+		const activeDays = []
+		if (days.odd_days) activeDays.push('Тоқ куннар')
+		if (days.even_days) activeDays.push('Жуфт куннар')
+		if (days.every_days) activeDays.push('Ҳар куни')
+		if (days.sunday) activeDays.push('Якшанба')
+
+		return activeDays.length > 0 ? activeDays.join(', ') : 'Белгиланмаган'
+	}
+
 	const filteredGroups = groups.filter(isGroupActiveForFilter)
 
 	return (
-		<div className='min-h-screen bg-gray-50 p-4'>
+		<div className='min-h-screen bg-gray-50 p-4' onMouseMove={handleMouseMove}>
 			<div className='max-w-7xl mx-auto bg-white rounded-lg shadow-sm'>
 				<div className='flex items-center justify-between p-6 border-b border-gray-200'>
 					<h1 className='text-xl font-medium text-gray-700'>
@@ -263,7 +299,7 @@ const JadvalniKorish = () => {
 										<div className='relative p-2 min-h-20 flex items-center'>
 											{block && (
 												<div
-													className={`absolute ${block.color} text-white text-xs px-2 py-1 rounded font-medium`}
+													className={`absolute ${block.color} text-white text-xs px-2 py-1 rounded font-medium cursor-pointer hover:opacity-90 transition-opacity`}
 													style={{
 														left: `${block.startPosition}%`,
 														width: `${block.width}%`,
@@ -272,6 +308,8 @@ const JadvalniKorish = () => {
 														border: block.border,
 														boxShadow: block.boxShadow,
 													}}
+													onMouseEnter={e => handleMouseEnter(e, block.group)}
+													onMouseLeave={handleMouseLeave}
 												>
 													{block.subject}{' '}
 													<span className='ml-2'>
@@ -287,6 +325,61 @@ const JadvalniKorish = () => {
 					</div>
 				)}
 			</div>
+
+			{/* Tooltip */}
+			{hoveredGroup && (
+				<div
+					className='fixed z-50 bg-gray-800 text-white text-sm rounded-lg shadow-xl p-4 max-w-xs pointer-events-none'
+					style={{
+						left: tooltipPosition.x + 10,
+						top: tooltipPosition.y - 10,
+						transform: 'translateY(-100%)',
+					}}
+				>
+					<div className='space-y-2'>
+						<div className='font-semibold text-blue-300 border-b border-gray-600 pb-2'>
+							{hoveredGroup.name}
+						</div>
+
+						<div className='space-y-1 text-xs'>
+							<div>
+								<span className='text-gray-300'>Курс:</span>{' '}
+								<span className='text-white'>
+									{hoveredGroup.course || 'Белгиланмаган'}
+								</span>
+							</div>
+
+							<div>
+								<span className='text-gray-300'>Ўқитувчи:</span>{' '}
+								<span className='text-white'>
+									{hoveredGroup.teacher_fullName || 'Белгиланмаган'}
+								</span>
+							</div>
+
+							<div>
+								<span className='text-gray-300'>Филиал:</span>{' '}
+								<span className='text-white'>
+									{hoveredGroup.branch || 'Белгиланмаган'}
+								</span>
+							</div>
+
+							<div>
+								<span className='text-gray-300'>Куннар:</span>{' '}
+								<span className='text-white'>
+									{getDaysList(hoveredGroup.days)}
+								</span>
+							</div>
+
+							<div>
+								<span className='text-gray-300'>Талабалар сони:</span>{' '}
+								<span className='text-white'>
+									{hoveredGroup.students ? hoveredGroup.students.length : 0}
+								</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	)
 }
