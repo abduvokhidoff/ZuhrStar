@@ -353,7 +353,7 @@ const Kurslar = () => {
 
         {/* Kurs qo'shish modal */}
         {showAddForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-md  flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
               <h3 className="text-lg font-semibold mb-4">Yangi kurs qo'shish</h3>
 
@@ -400,21 +400,6 @@ const Kurslar = () => {
                     <option value="week">Hafta</option>
                     <option value="day">Kun</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Guruhlar soni *
-                  </label>
-                  <input
-                    type="number"
-                    value={newKurs.groups_count}
-                    onChange={(e) => setNewKurs({ ...newKurs, groups_count: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Masalan: 2"
-                    min="0"
-                    required
-                  />
                 </div>
 
                 <div>

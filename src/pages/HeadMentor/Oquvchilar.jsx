@@ -412,7 +412,7 @@ const Oquvchilar = () => {
       };
 
       const response = await fetch(
-        "https://zuhrstar-production.up.railway.app/api/students",
+        "https://zuhrstar-production.up.railway.app/api/st udents",
         {
           method: "POST",
           headers: {

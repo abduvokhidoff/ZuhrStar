@@ -44,7 +44,6 @@ const Aside = () => {
 			{ icon: Calendar, label: 'Kurslar', path: `/head-mentor/kurslar` },
 			{ icon: Plane, label: 'Mentorlar', path: '/head-mentor/mentorlar' },
 			{ icon: Calendar, label: 'Jadval', path: '/head-mentor/jadval' },
-			{ icon: TestTube, label: 'Test Javoblar', path: '/head-mentor/test' },
 			{ icon: Layers, label: 'Materiallar', path: '/head-mentor/material' },
 			{
 				icon: MessagesSquare,

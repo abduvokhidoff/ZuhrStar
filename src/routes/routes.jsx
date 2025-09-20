@@ -1,4 +1,4 @@
-import { createBrowserRouter, createHashRouter } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 import RoleBasedRoute from '../components/RoleBasedRoute'
 import LoginLayout from '../layouts/LoginLayout'
 import SuperAdminLayout from '../layouts/SuperAdminLayout'
@@ -15,7 +15,6 @@ import HeadMentorGuruhlar from '../pages/HeadMentor/Guruhlar'
 import HeadMentorHisobotlar from '../pages/HeadMentor/Hisobotlar'
 import HeadMentorSozlamalar from '../pages/HeadMentor/Sozlamalar'
 import HeadMentorJadval from '../pages/HeadMentor/JadvalniKorish'
-import HeadMentorTest from '../pages/HeadMentor/TestNatija'
 import HeadMentorMaterial from '../pages/HeadMentor/OquvMaterial'
 
 import AdminDashboard from '../pages/Admin/Dashboard'
@@ -48,7 +47,7 @@ import MentorGoogleMeet from '../pages/Mentor/GoogleMeet'
 import SupportMentorDashboard from '../pages/SupportMentor/Dashboard'
 import SupportMentorDarslar from '../pages/SupportMentor/QoshimchaDarslar'
 
-const routes = createHashRouter([
+const routes = createBrowserRouter([
 	{
 		path: '/login',
 		element: <LoginLayout />,
@@ -120,7 +119,6 @@ const routes = createHashRouter([
 					{ path: 'guruhlar', element: <HeadMentorGuruhlar /> },
 					{ path: 'jadval', element: <HeadMentorJadval /> },
 					{ path: 'hisobotlar', element: <HeadMentorHisobotlar /> },
-					{ path: 'test', element: <HeadMentorTest /> },
 					{ path: 'sozlamalar', element: <HeadMentorSozlamalar /> },
 				],
 			},
