@@ -1,19 +1,47 @@
-import React, { useState, useEffect } from 'react'
-import { Search, Filter, Plus, Edit, Eye, Users, Trash2, X } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import {
+	Search,
+	Filter,
+	Plus,
+	Edit,
+	Eye,
+	Users,
+	Trash2,
+	ChevronRight,
+	Mail,
+	Phone,
+	Briefcase,
+	MapPin,
+	Loader2,
+	X,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '../../redux/authSlice'
 
-const Mentorlar = () => {
+const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+
+const cx = (...a) => a.filter(Boolean).join(' ')
+const Btn = ({ as: Tag = 'button', className = '', ...p }) => (
+	<Tag
+		{...p}
+		className={cx(
+			'inline-flex items-center justify-center rounded-xl transition',
+			className
+		)}
+	/>
+)
+
+export default function Mentorlar() {
 	const [mentors, setMentors] = useState([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState(null)
 	const [searchQuery, setSearchQuery] = useState('')
+
 	const [selectedMentor, setSelectedMentor] = useState(null)
-	const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-	const [mentorToDelete, setMentorToDelete] = useState(null)
 	const [isAddingNew, setIsAddingNew] = useState(false)
-	const [formData, setFormData] = useState({
+	const [isViewOnly, setIsViewOnly] = useState(false)
+	const emptyForm = {
 		fullName: '',
 		phone: '',
 		email: '',
@@ -25,12 +53,22 @@ const Mentorlar = () => {
 		position: '',
 		location: '',
 		skype_username: '',
-	})
+		profileImage: '',
+	}
+	const [formData, setFormData] = useState(emptyForm)
 	const [formLoading, setFormLoading] = useState(false)
 	const [formError, setFormError] = useState(null)
+
+	const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+	const [mentorToDelete, setMentorToDelete] = useState(null)
+
 	const navigate = useNavigate()
 	const dispatch = useDispatch()
-	const token = useSelector(state => state.auth.accessToken)
+	const token = useSelector(s => s.auth.accessToken)
+	const authHeaders = {
+		Authorization: `Bearer ${token}`,
+		'Content-Type': 'application/json',
+	}
 
 	const fetchMentors = async () => {
 		if (!token) {
@@ -38,579 +76,625 @@ const Mentorlar = () => {
 			setLoading(false)
 			return
 		}
-
 		try {
 			setLoading(true)
 			setError(null)
-			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/teachers',
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-					},
-				}
-			)
-
-			if (!response.ok) {
-				const errorText = await response.text()
-				const errorMessages = {
-					401: 'Authentication failed. Please log in again.',
-					403: 'You do not have permission to access this resource.',
-					500: 'Server error. Please try again later.',
-				}
-				if (response.status === 401) {
+			const res = await fetch(`${API_BASE}/teachers`, { headers: authHeaders })
+			if (!res.ok) {
+				if (res.status === 401) {
 					dispatch(logout())
 					navigate('/login')
 				}
-				throw new Error(
-					errorMessages[response.status] ||
-						`HTTP error: ${response.status} - ${errorText}`
-				)
+				throw new Error((await res.text()) || 'Xatolik')
 			}
-
-			const data = await response.json()
-			const formattedMentors =
-				data.teachers && Array.isArray(data.teachers)
-					? data.teachers.map(teacher => ({
-							id: teacher.teacher_id || teacher._id || teacher.email,
-							name: teacher.fullName || 'N/A',
-							username: teacher.email || 'N/A',
-							phone: teacher.phone || 'N/A',
-							role: teacher.role || 'Teacher',
-					  }))
-					: []
-			setMentors(formattedMentors)
-		} catch (error) {
-			setError(error.message || "Ma'lumotlarni yuklashda xato")
+			const data = await res.json()
+			const list = Array.isArray(data?.teachers) ? data.teachers : []
+			const mentorsOnly = list
+				.filter(t => (t.role || '').toLowerCase() === 'mentor')
+				.map(t => ({
+					id: t.teacher_id || t._id || t.email,
+					name: t.fullName || 'N/A',
+					username: t.email || 'N/A',
+					phone: t.phone || 'N/A',
+					role: t.role || 'Mentor',
+					company: t.company || '',
+					position: t.position || '',
+					location: t.location || '',
+					gender: t.gender || 'erkak',
+					profileImage:
+						t.imgURL || t.profileImage || t.profile_image || t.avatar || '',
+				}))
+			setMentors(mentorsOnly)
+		} catch (e) {
+			setError(e.message || "Ma'lumotlarni yuklashda xato")
 			setMentors([])
 		} finally {
 			setLoading(false)
 		}
 	}
-
 	useEffect(() => {
 		fetchMentors()
-	}, [token])
+	}, [token]) // eslint-disable-line
 
-	const handleEdit = async teacherId => {
-		if (!token) {
-			setFormError('No authentication token found. Please log in.')
-			return
-		}
-
+	const loadTeacher = async (id, view = false) => {
+		if (!token)
+			return setFormError('No authentication token found. Please log in.')
 		try {
 			setFormLoading(true)
 			setFormError(null)
 			setIsAddingNew(false)
-			const response = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/teachers/${teacherId}`,
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-					},
-				}
-			)
-
-			if (!response.ok) {
-				if (response.status === 401) {
+			setIsViewOnly(view)
+			const r = await fetch(`${API_BASE}/teachers/${id}`, {
+				headers: authHeaders,
+			})
+			if (!r.ok) {
+				if (r.status === 401) {
 					dispatch(logout())
 					navigate('/login')
 				}
 				throw new Error('Failed to fetch teacher data')
 			}
-
-			const data = await response.json()
+			const d = await r.json()
 			setFormData({
-				fullName: data.fullName || '',
-				phone: data.phone || '',
-				email: data.email || '',
+				fullName: d.fullName || '',
+				phone: d.phone || '',
+				email: d.email || '',
 				password: '',
-				date_of_birth: data.date_of_birth || '2025-08-06',
-				gender: data.gender || 'erkak',
-				role: data.role || 'Mentor',
-				company: data.company || '',
-				position: data.position || '',
-				location: data.location || '',
-				skype_username: data.skype_username || '',
+				date_of_birth: d.date_of_birth || '2025-08-06',
+				gender: d.gender || 'erkak',
+				role: d.role || 'Mentor',
+				company: d.company || '',
+				position: d.position || '',
+				location: d.location || '',
+				skype_username: d.skype_username || '',
+				profileImage:
+					d.imgURL || d.profileImage || d.profile_image || d.avatar || '',
 			})
-			setSelectedMentor(teacherId)
-		} catch (error) {
-			setFormError(error.message)
+			setSelectedMentor(id)
+		} catch (e) {
+			setFormError(e.message)
 		} finally {
 			setFormLoading(false)
 		}
 	}
-
+	const handleEdit = id => loadTeacher(id, false)
+	const handleView = id => loadTeacher(id, true)
 	const handleAddNew = () => {
 		setIsAddingNew(true)
+		setIsViewOnly(false)
 		setSelectedMentor(null)
-		setFormData({
-			fullName: '',
-			phone: '',
-			email: '',
-			password: '',
-			date_of_birth: '2025-08-06',
-			gender: 'erkak',
-			role: 'Mentor',
-			company: '',
-			position: '',
-			location: '',
-			skype_username: '',
-		})
+		setFormData(emptyForm)
 	}
-
-	const handleChange = e => {
-		const { name, value } = e.target
-		setFormData(prev => ({ ...prev, [name]: value }))
-	}
-
+	const handleChange = e =>
+		setFormData(p => ({ ...p, [e.target.name]: e.target.value }))
 	const handleSubmit = async e => {
-		e.preventDefault()
-		if (!token) {
-			setFormError('No authentication token found. Please log in.')
-			return
-		}
-
+		e.preventDefault?.()
+		if (!token)
+			return setFormError('No authentication token found. Please log in.')
 		try {
 			setFormLoading(true)
 			setFormError(null)
-
 			const payload = { ...formData }
-			if (!payload.password) {
-				delete payload.password
-			}
+			if (!payload.password) delete payload.password
+			if (payload.profileImage && !payload.imgURL)
+				payload.imgURL = payload.profileImage
+			delete payload.profileImage
 
 			const url = isAddingNew
-				? 'https://zuhrstar-production.up.railway.app/api/teachers/register'
-				: `https://zuhrstar-production.up.railway.app/api/teachers/${selectedMentor}`
+				? `${API_BASE}/teachers/register`
+				: `${API_BASE}/teachers/${selectedMentor}`
 			const method = isAddingNew ? 'POST' : 'PUT'
-
-			const response = await fetch(url, {
+			const res = await fetch(url, {
 				method,
-				headers: {
-					Authorization: `Bearer ${token}`,
-					'Content-Type': 'application/json',
-				},
+				headers: authHeaders,
 				body: JSON.stringify(payload),
 			})
-
-			if (!response.ok) {
-				const errorText = await response.text()
-				if (response.status === 401) {
+			if (!res.ok) {
+				if (res.status === 401) {
 					dispatch(logout())
 					navigate('/login')
 				}
 				throw new Error(
-					`Failed to ${isAddingNew ? 'create' : 'update'} teacher: ${errorText}`
+					`Failed to ${
+						isAddingNew ? 'create' : 'update'
+					} teacher: ${await res.text()}`
 				)
 			}
-
 			setSelectedMentor(null)
 			setIsAddingNew(false)
 			fetchMentors()
-		} catch (error) {
-			setFormError(error.message)
+		} catch (e) {
+			setFormError(e.message)
 		} finally {
 			setFormLoading(false)
 		}
 	}
-
 	const handleCloseModal = () => {
 		setSelectedMentor(null)
 		setIsAddingNew(false)
+		setIsViewOnly(false)
 		setFormError(null)
 	}
 
-	const filteredMentors = mentors.filter(
-		mentor =>
-			mentor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			mentor.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			mentor.phone.includes(searchQuery)
-	)
-
-	const handleView = teacherId => navigate(`/mentors/${teacherId}`)
-	const handleUsers = teacherId =>
-		console.log(`Manage users for mentor ${teacherId}`)
-
-	const handleDelete = async teacherId => {
-		setMentorToDelete(teacherId)
+	const handleDelete = id => {
+		setMentorToDelete(id)
 		setDeleteModalOpen(true)
 	}
-
 	const confirmDelete = async () => {
 		if (!token) {
 			setError('No authentication token found. Please log in.')
 			setDeleteModalOpen(false)
 			return
 		}
-
 		try {
-			const response = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/teachers/${mentorToDelete}`,
-				{
-					method: 'DELETE',
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-					},
-				}
-			)
-
-			if (!response.ok) {
-				const errorText = await response.text()
-				if (response.status === 401) {
+			const r = await fetch(`${API_BASE}/teachers/${mentorToDelete}`, {
+				method: 'DELETE',
+				headers: authHeaders,
+			})
+			if (!r.ok) {
+				if (r.status === 401) {
 					dispatch(logout())
 					navigate('/login')
 				}
-				throw new Error(`Failed to delete mentor: ${errorText}`)
+				throw new Error(`Failed to delete mentor: ${await r.text()}`)
 			}
-
 			fetchMentors()
-		} catch (error) {
-			setError(error.message || 'Failed to delete mentor')
+		} catch (e) {
+			setError(e.message || 'Failed to delete mentor')
 		} finally {
 			setDeleteModalOpen(false)
 			setMentorToDelete(null)
 		}
 	}
 
-	const cancelDelete = () => {
-		setDeleteModalOpen(false)
-		setMentorToDelete(null)
-	}
+	const filteredMentors = useMemo(
+		() =>
+			mentors.filter(
+				m =>
+					m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+					m.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+					m.phone.includes(searchQuery)
+			),
+		[mentors, searchQuery]
+	)
+
+	const handleUsers = () => navigate('/head-mentor/guruhlar')
 
 	return (
-		<div className='min-h-screen bg-gray-50 p-6'>
-			{/* Header */}
-			<div className='bg-white border-b border-gray-200 px-6 py-4 mb-6'>
+		<div className='min-h-screen p-6'>
+			<div className='bg-white/90 backdrop-blur-xl px-8 py-6 mb-8 rounded-3xl shadow-xl border border-white/20'>
 				<div className='flex items-center justify-between'>
-					<h1 className='text-xl font-semibold text-gray-900'>XODIMLAR</h1>
-					<span className='text-sm text-gray-500'>Xodimlar</span>
+					<div>
+						<h1 className='text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent'>
+							Mentorlar
+						</h1>
+						<p className='text-gray-600 text-base mt-1'>
+							Foydalanuvchilar ro'yxati (faqat Mentorlar)
+						</p>
+					</div>
+					<div className='bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-2xl shadow-lg'>
+						<span className='text-sm font-semibold'>
+							Jami: {filteredMentors.length} ta
+						</span>
+					</div>
 				</div>
 			</div>
 
-			{/* Controls */}
-			<div className='bg-white border-b border-gray-200 px-6 py-4 mb-6'>
-				<div className='flex items-center justify-between'>
-					<div className='relative flex-1 max-w-md'>
-						<Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
+			<div className='bg-white/90 backdrop-blur-xl px-8 py-5 mb-8 rounded-3xl shadow-xl border border-white/20'>
+				<div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
+					<div className='relative w-full sm:max-w-md'>
+						<Search className='absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5' />
 						<input
-							type='text'
-							placeholder='Qidirish ...'
 							value={searchQuery}
 							onChange={e => setSearchQuery(e.target.value)}
-							className='w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+							placeholder='Qidirish (ism, email, telefon)...'
+							className='w-full pl-12 pr-4 py-4 rounded-2xl focus:ring-2 focus:ring-blue-500 border-0 bg-gray-50 shadow-inner text-gray-700 placeholder-gray-500'
 						/>
 					</div>
-
-					<div className='flex items-center space-x-3 ml-6'>
-						<button className='flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600'>
-							<Filter className='w-4 h-4' />
-							<span>Filter</span>
-						</button>
-						<button
+					<div className='flex items-center gap-3'>
+						<Btn className='px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-2xl hover:from-gray-200 hover:to-gray-300 shadow-lg'>
+							<Filter className='w-5 h-5 mr-2' /> Filter
+						</Btn>
+						<Btn
 							onClick={handleAddNew}
-							className='flex items-center space-x-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600'
+							className='px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 shadow-lg'
 						>
-							<Plus className='w-4 h-4' />
-							<span>Foydalanuvchi qo'shish</span>
-						</button>
+							<Plus className='w-5 h-5 mr-2' /> Yangi mentor
+						</Btn>
 					</div>
 				</div>
 			</div>
 
-			{/* Error Message */}
 			{error && (
-				<div className='bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6'>
+				<div className='bg-gradient-to-r from-red-50 to-pink-50 text-red-700 px-6 py-4 rounded-2xl mb-8 shadow-lg border border-red-200'>
 					{error}
-					<button
+					<Btn
 						onClick={fetchMentors}
-						className='ml-4 px-4 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600'
+						className='ml-4 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow'
 					>
-						Retry
-					</button>
+						Qayta urinish
+					</Btn>
 				</div>
 			)}
 
-			{/* Table */}
-			<div className='bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mb-6'>
-				<div className='overflow-x-auto'>
-					<table className='w-full'>
-						<thead className='bg-gray-50 border-b border-gray-100'>
-							<tr>
-								<th className='text-left px-6 py-4 text-sm font-medium text-gray-600'>
-									Ism
-								</th>
-								<th className='text-left px-6 py-4 text-sm font-medium text-gray-600'>
-									Foydalanuvchi nomi
-								</th>
-								<th className='text-left px-6 py-4 text-sm font-medium text-gray-600'>
-									Telefon
-								</th>
-								<th className='text-left px-6 py-4 text-sm font-medium text-gray-600'>
-									Rol
-								</th>
-								<th className='text-left px-6 py-4 text-sm font-medium text-gray-600'>
-									Harakatlar
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							{loading ? (
-								<tr>
-									<td
-										colSpan='5'
-										className='px-6 py-8 text-center text-gray-500'
-									>
-										<div className='flex justify-center items-center'>
-											<div className='animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent'></div>
+			<div className='mb-8'>
+				{loading ? (
+					<div className='flex justify-center items-center py-32'>
+						<Loader2 className='w-12 h-12 animate-spin text-blue-600' />
+					</div>
+				) : filteredMentors.length ? (
+					<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8'>
+						{filteredMentors.map(m => (
+							<div
+								key={m.id}
+								// 👇 NEW: open dedicated page
+								onClick={() => navigate(`/head-mentor/mentorlar/${m.id}`)}
+								className='group cursor-pointer bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 px-[20px] py-[10px] border border-white/30 hover:scale-[1.02] hover:bg-white/90'
+								title='Mentor sahifasi'
+							>
+								<div className='flex justify-center mb-6'>
+									<div className='relative'>
+										{m.profileImage ? (
+											<img
+												src={m.profileImage}
+												alt={m.name}
+												className='w-20 h-20 rounded-2xl object-cover shadow-xl border-4 border-white group-hover:border-blue-200 transition-all duration-300'
+												onError={e => {
+													e.currentTarget.style.display = 'none'
+													const fallback = e.currentTarget.nextSibling
+													if (fallback) fallback.style.display = 'flex'
+												}}
+											/>
+										) : null}
+										<div
+											className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-[18px] flex items-center justify-center shadow-xl border-4 border-white group-hover:border-blue-200 transition-all duration-300 ${
+												m.profileImage ? 'hidden' : 'flex'
+											}`}
+										>
+											{m.name
+												.split(' ')
+												.map(n => n[0])
+												.join('')
+												.toUpperCase()
+												.slice(0, 2)}
 										</div>
-									</td>
-								</tr>
-							) : filteredMentors.length > 0 ? (
-								filteredMentors.map(mentor => (
-									<tr
-										key={mentor.id}
-										className='border-b border-gray-50 hover:bg-gray-50/50'
-									>
-										<td className='px-6 py-4 text-sm text-gray-600'>
-											{mentor.name}
-										</td>
-										<td className='px-6 py-4 text-sm text-gray-600'>
-											{mentor.username}
-										</td>
-										<td className='px-6 py-4 text-sm text-gray-600'>
-											{mentor.phone}
-										</td>
-										<td className='px-6 py-4 text-sm font-medium text-gray-600'>
-											<span
-												className={`px-3 py-1 rounded-full text-xs font-medium ${
-													mentor.role === 'Teacher'
-														? 'bg-teal-100 text-teal-700'
-														: 'bg-purple-100 text-purple-700'
-												}`}
-											>
-												{mentor.role}
-											</span>
-										</td>
-										<td className='px-6 py-4'>
-											<div className='flex gap-2'>
-												<button
-													onClick={() => handleUsers(mentor.id)}
-													className='w-8 h-8 bg-emerald-100 hover:bg-emerald-200 rounded flex items-center justify-center'
-												>
-													<Users className='w-4 h-4 text-emerald-600' />
-												</button>
-												<button
-													onClick={() => handleEdit(mentor.id)}
-													className='w-8 h-8 bg-blue-100 hover:bg-blue-200 rounded flex items-center justify-center'
-												>
-													<Edit className='w-4 h-4 text-blue-600' />
-												</button>
-												<button
-													onClick={() => handleView(mentor.id)}
-													className='w-8 h-8 bg-indigo-100 hover:bg-indigo-200 rounded flex items-center justify-center'
-												>
-													<Eye className='w-4 h-4 text-indigo-600' />
-												</button>
-												<button
-													onClick={() => handleDelete(mentor.id)}
-													className='w-8 h-8 bg-red-100 hover:bg-red-200 rounded flex items-center justify-center'
-												>
-													<Trash2 className='w-4 h-4 text-red-600' />
-												</button>
+									</div>
+								</div>
+
+								<div className='text-center mb-6'>
+									<div className='flex items-center justify-center gap-2 mb-2'>
+										<h3 className='text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors duration-300'>
+											{m.name}
+										</h3>
+										<ChevronRight className='w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300' />
+									</div>
+									<span className='inline-block px-4 py-1.5 text-sm font-semibold rounded-full bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 shadow-sm'>
+										{m.role}
+									</span>
+								</div>
+
+								<div className='space-y-4 mb-6'>
+									<div className='flex items-center gap-4 text-gray-600'>
+										<div className='w-10 h-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl flex items-center justify-center shadow-sm'>
+											<Mail className='w-5 h-5 text-blue-600' />
+										</div>
+										<span className='text-sm font-medium truncate flex-1'>
+											{m.username}
+										</span>
+									</div>
+
+									<div className='flex items-center gap-4 text-gray-600'>
+										<div className='w-10 h-10 bg-gradient-to-br from-green-50 to-green-100 rounded-xl flex items-center justify-center shadow-sm'>
+											<Phone className='w-5 h-5 text-green-600' />
+										</div>
+										<span className='text-sm font-medium'>{m.phone}</span>
+									</div>
+
+									{m.position && (
+										<div className='flex items-center gap-4 text-gray-600'>
+											<div className='w-10 h-10 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl flex items-center justify-center shadow-sm'>
+												<Briefcase className='w-5 h-5 text-purple-600' />
 											</div>
-										</td>
-									</tr>
-								))
-							) : (
-								<tr>
-									<td
-										colSpan='5'
-										className='px-6 py-8 text-center text-gray-500'
+											<span className='text-sm font-medium truncate flex-1'>
+												{m.position}
+											</span>
+										</div>
+									)}
+
+									{m.location && (
+										<div className='flex items-center gap-4 text-gray-600'>
+											<div className='w-10 h-10 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl flex items-center justify-center shadow-sm'>
+												<MapPin className='w-5 h-5 text-orange-600' />
+											</div>
+											<span className='text-sm font-medium truncate flex-1'>
+												{m.location}
+											</span>
+										</div>
+									)}
+								</div>
+
+								<div className='flex justify-between items-center pt-6 mt-6 border-t border-gray-100'>
+									<div className='flex gap-2'>
+										<Btn
+											onClick={e => {
+												e.stopPropagation()
+												handleUsers()
+											}}
+											className='w-11 h-11 bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-md'
+											title='Foydalanuvchilar'
+										>
+											<Users className='w-5 h-5 text-green-600' />
+										</Btn>
+										<Btn
+											onClick={e => {
+												e.stopPropagation()
+												handleEdit(m.id)
+											}}
+											className='w-11 h-11 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-md'
+											title='Tahrirlash'
+										>
+											<Edit className='w-5 h-5 text-blue-600' />
+										</Btn>
+										<Btn
+											onClick={e => {
+												e.stopPropagation()
+												handleView(m.id)
+											}}
+											className='w-11 h-11 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl shadow-md'
+											title="Ko'rish"
+										>
+											<Eye className='w-5 h-5 text-indigo-600' />
+										</Btn>
+									</div>
+									<Btn
+										onClick={e => {
+											e.stopPropagation()
+											setDeleteModalOpen(true)
+											setMentorToDelete(m.id)
+										}}
+										className='w-11 h-11 bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-md'
+										title="O'chirish"
 									>
-										Hech qanday xodim topilmadi
-									</td>
-								</tr>
-							)}
-						</tbody>
-					</table>
-				</div>
+										<Trash2 className='w-5 h-5 text-red-600' />
+									</Btn>
+								</div>
+							</div>
+						))}
+					</div>
+				) : (
+					<div className='text-center py-24 text-gray-500 text-lg'>
+						Hech qanday mentor topilmadi
+					</div>
+				)}
 			</div>
 
-			{/* Add/Edit Modal */}
+			{/* Edit/View Modal (unchanged) */}
 			{(selectedMentor || isAddingNew) && (
-				<div className='fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50'>
-					<div className='bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto'>
-						<div className='flex justify-between items-center mb-4'>
-							<h2 className='text-xl font-semibold text-gray-900'>
-								{isAddingNew ? 'Add New Mentor' : 'Edit Mentor'}
+				<div className='fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-40'>
+					<div className='bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 max-w-3xl w-full mx-6 max-h-[90vh] overflow-y-auto border border-white/30'>
+						<div className='flex justify-between items-center mb-6'>
+							<h2 className='text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent'>
+								{isAddingNew
+									? "Yangi mentor qo'shish"
+									: isViewOnly
+									? 'Mentor maʼlumotlari'
+									: 'Mentorni tahrirlash'}
 							</h2>
-							<button
+							<Btn
 								onClick={handleCloseModal}
-								className='text-gray-500 hover:text-gray-700'
+								className='p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl'
 							>
 								<X className='w-6 h-6' />
-							</button>
+							</Btn>
 						</div>
-						{formError && <p className='text-red-500 mb-4'>{formError}</p>}
-						{formLoading && <p>Loading...</p>}
+
+						{formError && (
+							<div className='bg-red-50 text-red-700 px-6 py-4 rounded-2xl mb-6 border border-red-200'>
+								{formError}
+							</div>
+						)}
+						{formLoading && (
+							<div className='text-center py-8'>
+								<Loader2 className='w-10 h-10 animate-spin text-blue-600 mx-auto' />
+								<p className='text-gray-500 mt-2'>Ma'lumotlar yuklanmoqda...</p>
+							</div>
+						)}
+
 						<form
 							onSubmit={handleSubmit}
-							className='grid grid-cols-1 gap-4 md:grid-cols-2'
+							className='grid grid-cols-1 gap-6 md:grid-cols-2'
 						>
-							<div>
-								<label className='block text-sm font-medium text-gray-600'>
-									To'liq ismi
+							<div className='md:col-span-2'>
+								<label className='block text-sm font-semibold text-gray-700 mb-2'>
+									Profil rasmi (imgURL)
 								</label>
 								<input
-									type='text'
-									name='fullName'
-									value={formData.fullName}
+									type='url'
+									name='profileImage'
+									value={formData.profileImage}
 									onChange={handleChange}
-									className='w-full p-2 border border-gray-300 rounded-lg'
-									required
+									disabled={isViewOnly}
+									placeholder='https://example.com/teacher.jpg'
+									className='w-full p-4 rounded-xl focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm'
 								/>
 							</div>
+
+							{[
+								{
+									l: "To'liq ismi *",
+									n: 'fullName',
+									t: 'text',
+									r: !isViewOnly,
+								},
+								{ l: 'Telefon raqami', n: 'phone', t: 'text' },
+								{ l: 'Email *', n: 'email', t: 'email', r: true },
+							].map(f => (
+								<div key={f.n}>
+									<label className='block text-sm font-semibold text-gray-700 mb-2'>
+										{f.l}
+									</label>
+									<input
+										type={f.t}
+										name={f.n}
+										value={formData[f.n]}
+										onChange={handleChange}
+										disabled={isViewOnly}
+										required={f.r}
+										className='w-full p-4 rounded-xl focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm'
+									/>
+								</div>
+							))}
+
 							<div>
-								<label className='block text-sm font-medium text-gray-600'>
-									Telefon raqami
-								</label>
-								<input
-									type='text'
-									name='phone'
-									value={formData.phone}
-									onChange={handleChange}
-									className='w-full p-2 border border-gray-300 rounded-lg'
-								/>
-							</div>
-							<div>
-								<label className='block text-sm font-medium text-gray-600'>
-									Email
-								</label>
-								<input
-									type='email'
-									name='email'
-									value={formData.email}
-									onChange={handleChange}
-									className='w-full p-2 border border-gray-300 rounded-lg'
-									required
-								/>
-							</div>
-							<div>
-								<label className='block text-sm font-medium text-gray-600'>
-									Parol
+								<label className='block text-sm font-semibold text-gray-700 mb-2'>
+									Parol {isAddingNew && '*'}
 								</label>
 								<input
 									type='password'
 									name='password'
 									value={formData.password}
 									onChange={handleChange}
-									className='w-full p-2 border border-gray-300 rounded-lg'
+									disabled={isViewOnly}
 									required={isAddingNew}
+									placeholder={
+										isAddingNew ? '' : "O'zgartirmasangiz bo'sh qoldiring"
+									}
+									className='w-full p-4 rounded-xl focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm'
 								/>
 							</div>
+
 							<div>
-								<label className='block text-sm font-medium text-gray-600'>
-									Tug'ulgan sanasi
+								<label className='block text-sm font-semibold text-gray-700 mb-2'>
+									Tug'ilgan sanasi
 								</label>
 								<input
 									type='date'
 									name='date_of_birth'
 									value={formData.date_of_birth}
 									onChange={handleChange}
-									className='w-full p-2 border border-gray-300 rounded-lg'
+									disabled={isViewOnly}
+									className='w-full p-4 rounded-xl focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm'
 								/>
 							</div>
+
 							<div>
-								<label className='block text-sm font-medium text-gray-600'>
+								<label className='block text-sm font-semibold text-gray-700 mb-2'>
 									Jinsi
 								</label>
 								<select
 									name='gender'
 									value={formData.gender}
 									onChange={handleChange}
-									className='w-full p-2 border border-gray-300 rounded-lg'
+									disabled={isViewOnly}
+									className='w-full p-4 rounded-xl focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm'
 								>
 									<option value='erkak'>Erkak</option>
 									<option value='ayol'>Ayol</option>
 								</select>
 							</div>
+
 							<div>
-								<label className='block text-sm font-medium text-gray-600'>
-									Role
+								<label className='block text-sm font-semibold text-gray-700 mb-2'>
+									Rol
 								</label>
 								<select
 									name='role'
 									value={formData.role}
 									onChange={handleChange}
-									className='w-full p-2 border border-gray-300 rounded-lg'
+									disabled={isViewOnly}
+									className='w-full p-4 rounded-xl focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm'
 								>
 									<option value='Mentor'>Mentor</option>
 									<option value='Teacher'>Teacher</option>
 								</select>
 							</div>
+
+							{[
+								{ l: 'Kompaniya', n: 'company' },
+								{ l: 'Lavozim', n: 'position' },
+								{ l: 'Manzil', n: 'location' },
+								{ l: 'Skype username', n: 'skype_username' },
+							].map(f => (
+								<div key={f.n}>
+									<label className='block text-sm font-semibold text-gray-700 mb-2'>
+										{f.l}
+									</label>
+									<input
+										name={f.n}
+										value={formData[f.n]}
+										onChange={handleChange}
+										disabled={isViewOnly}
+										className='w-full p-4 rounded-xl focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm'
+									/>
+								</div>
+							))}
 						</form>
-						<div className='mt-6 flex justify-end gap-4'>
-							<button
-								type='button'
+
+						<div className='mt-8 flex justify-end gap-4'>
+							<Btn
 								onClick={handleCloseModal}
-								className='px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400'
+								className='px-6 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl shadow-sm'
 							>
-								Cancel
-							</button>
-							<button
-								type='submit'
-								onClick={handleSubmit}
-								disabled={formLoading}
-								className='px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300'
-							>
-								{formLoading
-									? isAddingNew
-										? 'Creating...'
-										: 'Updating...'
-									: isAddingNew
-									? 'Create'
-									: 'Update'}
-							</button>
+								{isViewOnly ? 'Yopish' : 'Bekor qilish'}
+							</Btn>
+							{!isViewOnly && (
+								<Btn
+									onClick={handleSubmit}
+									disabled={formLoading}
+									className='px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg'
+								>
+									{formLoading
+										? isAddingNew
+											? 'Yaratilmoqda...'
+											: 'Yangilanmoqda...'
+										: isAddingNew
+										? 'Yaratish'
+										: 'Yangilash'}
+								</Btn>
+							)}
 						</div>
 					</div>
 				</div>
 			)}
 
-			{/* Delete Confirmation Modal */}
+			{/* Delete Modal (unchanged) */}
 			{deleteModalOpen && (
-				<div className='fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50'>
-					<div className='bg-white rounded-lg shadow-lg p-6 max-w-md w-full'>
-						<div className='flex justify-between items-center mb-4'>
-							<h2 className='text-xl font-semibold text-gray-900'>
+				<div className='fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-50'>
+					<div className='bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 max-w-md w-full mx-6 border border-white/30'>
+						<div className='flex justify-between items-center mb-6'>
+							<h2 className='text-2xl font-bold text-gray-900'>
 								O'chirishni tasdiqlang
 							</h2>
-							<button
-								onClick={cancelDelete}
-								className='text-gray-500 hover:text-gray-700'
+							<Btn
+								onClick={() => {
+									setDeleteModalOpen(false)
+									setMentorToDelete(null)
+								}}
+								className='p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl'
 							>
 								<X className='w-6 h-6' />
-							</button>
+							</Btn>
 						</div>
-						<p className='text-gray-600 mb-6'>
-							Rostdan ham ushbu foydalanuvchini o'chirmoqchimisiz?
+						<p className='text-gray-600 mb-8 text-lg'>
+							Rostdan ham ushbu foydalanuvchini o'chirmoqchimisiz? Bu amalni
+							qaytarib bo'lmaydi.
 						</p>
 						<div className='flex justify-end gap-4'>
-							<button
-								onClick={cancelDelete}
-								className='px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400'
+							<Btn
+								onClick={() => {
+									setDeleteModalOpen(false)
+									setMentorToDelete(null)
+								}}
+								className='px-6 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl'
 							>
 								Bekor qilish
-							</button>
-							<button
+							</Btn>
+							<Btn
 								onClick={confirmDelete}
-								className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'
+								className='px-6 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl shadow-lg'
 							>
 								Ha, o'chirish
-							</button>
+							</Btn>
 						</div>
 					</div>
 				</div>
@@ -618,5 +702,3 @@ const Mentorlar = () => {
 		</div>
 	)
 }
-
-export default Mentorlar
