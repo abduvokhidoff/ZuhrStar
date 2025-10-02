@@ -41,12 +41,8 @@ const MentorDetail = () => {
 		? groups.filter(group => group.teacher_fullName === mentor.fullName)
 		: []
 
+
 	// update selected group when attachedGroups change
-	useEffect(() => {
-		if (attachedGroups.length > 0) {
-			setSelectedGroup(attachedGroups[0].group_id)
-		}
-	}, [attachedGroups])
 
 	if (!mentor) {
 		return (
