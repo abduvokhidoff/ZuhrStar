@@ -46,12 +46,12 @@ import MentorKurslar from '../pages/Mentor/Kurslar'
 import MentorGuruhlar from '../pages/Mentor/Guruhlar'
 import MentorSozlamalar from '../pages/Mentor/Sozlamalar'
 import MentorGoogleMeet from '../pages/Mentor/GoogleMeet'
+import DarsJadvali from '../pages/Mentor/DarsJadvali'
 
 import SupportMentorDashboard from '../pages/SupportMentor/Dashboard'
 import SupportMentorDarslar from '../pages/SupportMentor/QoshimchaDarslar'
 
 const routes = createHashRouter([
-
 	{
 		path: '/login',
 		element: <LoginLayout />,
@@ -142,6 +142,7 @@ const routes = createHashRouter([
 					{ path: "o'quvchilar", element: <MentorOquvchilar /> },
 					{ path: 'kurslar', element: <MentorKurslar /> },
 					{ path: 'guruhlar', element: <MentorGuruhlar /> },
+					{ path: 'guruhlar/dars-jadvali', element: <DarsJadvali /> },
 					{ path: 'sozlamalar', element: <MentorSozlamalar /> },
 					{ path: 'google-meet', element: <MentorGoogleMeet /> },
 				],
