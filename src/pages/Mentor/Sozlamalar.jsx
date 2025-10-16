@@ -1,445 +1,791 @@
-import React, { useState } from "react";
+// Sozlamalar.jsx (Tailwind-only, brand ko‘k: #1777C9)
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+// ❗️ o'zingizdagi slice manzilini qo'ying
+// import { setCredentials, logout } from "@/store/authSlice";
 
-const humanDate = (d) => {
-  try {
-    if (!d) return "-";
-    const dt = new Date(d);
-    if (Number.isNaN(dt.getTime())) return d;
-    return dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
-  } catch {
-    return d || "-";
-  }
-};
+const BRAND = '#1777C9'
 
-const safe = (v, f = "-") => (v === null || v === undefined || v === "" ? f : v);
+/* -------------------- UI helpers -------------------- */
+const humanDate = d => {
+	try {
+		if (!d) return '-'
+		const dt = new Date(d)
+		if (Number.isNaN(dt.getTime())) return d
+		return dt.toLocaleDateString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: '2-digit',
+		})
+	} catch {
+		return d || '-'
+	}
+}
+const safe = (v, f = '-') => (v === null || v === undefined || v === '' ? f : v)
 
 const Avatar = ({ src, alt, size = 56 }) => (
-  <div
-    className="rounded-full bg-slate-200 overflow-hidden ring-1 ring-slate-200"
-    style={{ width: size, height: size }}
-  >
-    {src ? (
-      <img src={src} alt={alt || "avatar"} className="w-full h-full object-cover" />
-    ) : (
-      <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500" />
-    )}
-  </div>
-);
+	<div
+		className='rounded-full overflow-hidden ring-2 ring-white shadow-[0_8px_24px_-8px_rgba(2,6,23,.25)]'
+		style={{ width: size, height: size }}
+	>
+		{src ? (
+			<img
+				src={src}
+				alt={alt || 'avatar'}
+				className='w-full h-full object-cover'
+			/>
+		) : (
+			<div className='w-full h-full bg-gradient-to-br from-[#1777C9] to-[#6ea8ff]' />
+		)}
+	</div>
+)
 
-const Tabs = ({ items, active, onChange }) => (
-  <div className="flex gap-2 mb-4">
-    {items.map((t) => (
-      <button
-        key={t.key}
-        onClick={() => onChange(t.key)}
-        className={`px-4 py-2 rounded-lg text-sm font-medium transition
-        ${active === t.key ? "bg-blue-500 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-      >
-        {t.label}
-      </button>
-    ))}
-  </div>
-);
+const PillTabs = ({ items, active, onChange }) => (
+	<div className='inline-flex rounded-2xl bg-white/70 backdrop-blur border border-slate-200 p-1 shadow-sm'>
+		{items.map(t => {
+			const isActive = active === t.key
+			return (
+				<button
+					key={t.key}
+					onClick={() => onChange(t.key)}
+					className={[
+						'px-4 py-2 rounded-xl text-sm font-medium transition',
+						isActive
+							? 'bg-[#1777C9] text-white shadow-[0_6px_18px_-6px_rgba(23,119,201,.7)]'
+							: 'text-slate-600 hover:text-slate-800 hover:bg-slate-100',
+					].join(' ')}
+				>
+					{t.label}
+				</button>
+			)
+		})}
+	</div>
+)
 
 const KV = ({ label, value }) => (
-  <div className="py-1">
-    <div className="text-slate-500 text-xs mb-0.5">{label}</div>
-    <div className="text-slate-800 text-xs font-medium">
-      {safe(value)}
-    </div>
-  </div>
-);
+	<div className='py-1'>
+		<div className='text-slate-500 text-[11px] mb-0.5'>{label}</div>
+		<div className='text-slate-900 text-[13px] font-medium break-all'>
+			{safe(value)}
+		</div>
+	</div>
+)
 
-const Chip = ({ tone = "default", children }) => {
-  const tones = {
-    default: "bg-slate-100 text-slate-700",
-    low: "bg-green-100 text-green-700",
-    medium: "bg-amber-100 text-amber-700",
-    high: "bg-rose-100 text-rose-700",
-    pending: "bg-amber-100 text-amber-700",
-    approved: "bg-green-100 text-green-700",
-    rejected: "bg-rose-100 text-rose-700",
-  };
-  return <span className={`px-2 py-1 rounded text-xs font-medium ${tones[tone] || tones.default}`}>{children}</span>;
-};
+const Card = ({ children, className = '' }) => (
+	<div
+		className={
+			'bg-white/80 backdrop-blur rounded-2xl border border-slate-200 shadow-[0_12px_30px_-12px_rgba(2,6,23,.2)] ' +
+			className
+		}
+	>
+		{children}
+	</div>
+)
 
-const Sozlamalar = () => {
-  const [tab, setTab] = useState("projects");
+const IconBtn = ({ title, onClick, children }) => (
+	<button
+		title={title}
+		onClick={onClick}
+		className='p-2 rounded-xl bg-white/80 hover:bg-white border border-slate-200 text-slate-500 hover:text-slate-700 transition shadow-sm'
+	>
+		{children}
+	</button>
+)
 
-  // Mock user data matching the images
-  const me = {
-    id: 1,
-    full_name: "Evan Yates",
-    role: "UI/UX Designer",
-    position: "UI/UX Designer",
-    company: "Cadstra",
-    location: "NYC, New York, USA",
-    birth_date: "1996-05-19",
-    email: "evanyates@gmail.com",
-    phone: "+1 675 346 23-10",
-    skype: "Evan 2256",
-    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-    vacation_days: 12,
-    sick_days: 6,
-    remote_days: 42,
-    projects: [
-      {
-        id: 1,
-        code: "PN001269",
-        name: "Medical App (IOS native)",
-        created_at: "2020-09-12",
-        tasks_total: 34,
-        tasks_active: 13,
-        priority: "medium",
-        assignees: [
-          { id: 1, name: "User 1", image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=40&h=40&fit=crop&crop=face" },
-          { id: 2, name: "User 2", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face" },
-          { id: 3, name: "User 3", image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop&crop=face" },
-          { id: 4, name: "User 4", image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop&crop=face" }
-        ]
-      },
-      {
-        id: 2,
-        code: "PN001253",
-        name: "Food Delivery Service",
-        created_at: "2020-09-10",
-        tasks_total: 50,
-        tasks_active: 24,
-        priority: "medium",
-        assignees: [
-          { id: 1, name: "User 1", image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=40&h=40&fit=crop&crop=face" },
-          { id: 2, name: "User 2", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face" },
-          { id: 3, name: "User 3", image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop&crop=face" }
-        ]
-      },
-      {
-        id: 3,
-        code: "PN001250",
-        name: "Internal Project",
-        created_at: "2020-05-28",
-        tasks_total: 23,
-        tasks_active: 20,
-        priority: "low",
-        assignees: [
-          { id: 1, name: "User 1", image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=40&h=40&fit=crop&crop=face" },
-          { id: 2, name: "User 2", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face" },
-          { id: 3, name: "User 3", image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop&crop=face" },
-          { id: 4, name: "User 4", image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop&crop=face" }
-        ]
-      }
-    ]
-  };
+const PrimaryBtn = ({ children, onClick, className = '' }) => (
+	<button
+		onClick={onClick}
+		className={
+			'px-4 py-2 rounded-xl text-white bg-[#1777C9] hover:bg-[#0f62a7] shadow-[0_10px_24px_-10px_rgba(23,119,201,.9)] transition ' +
+			className
+		}
+	>
+		{children}
+	</button>
+)
 
-  const team = [
-    {
-      id: 2,
-      full_name: "Shawn Stone",
-      role: "UI/UX Designer",
-      level: "Middle",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face"
-    },
-    {
-      id: 3,
-      full_name: "Randy Delgado",
-      role: "UI/UX Designer",
-      level: "Junior",
-      image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&crop=face"
-    },
-    {
-      id: 4,
-      full_name: "Emily Tyler",
-      role: "Copywriter",
-      level: "Middle",
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face"
-    },
-    {
-      id: 5,
-      full_name: "Blake Silva",
-      role: "iOS Developer",
-      level: "Senior",
-      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face"
-    },
-    {
-      id: 6,
-      full_name: "Oscar Holloway",
-      role: "UI/UX Designer",
-      level: "Middle",
-      image: "https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=80&h=80&fit=crop&crop=face"
-    },
-    {
-      id: 7,
-      full_name: "Wayne Marsh",
-      role: "Copywriter",
-      level: "Junior",
-      image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=80&h=80&fit=crop&crop=face"
-    },
-    {
-      id: 8,
-      full_name: "Jeremy Barrett",
-      role: "UI/UX Designer",
-      level: "Middle",
-      image: "https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=80&h=80&fit=crop&crop=face"
-    }
-  ];
+const GhostBtn = ({ children, onClick }) => (
+	<button
+		onClick={onClick}
+		className='px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition'
+	>
+		{children}
+	</button>
+)
 
-  const vacationRequests = [
-    {
-      id: 1,
-      type: "Sick Leave",
-      duration: 3,
-      start_date: "2020-09-13",
-      end_date: "2020-09-16",
-      status: "pending"
-    },
-    {
-      id: 2,
-      type: "Work remotely",
-      duration: 1,
-      start_date: "2020-09-01",
-      end_date: "2020-09-02",
-      status: "approved"
-    },
-    {
-      id: 3,
-      type: "Vacation",
-      duration: 1,
-      start_date: "2020-09-01",
-      end_date: "2020-09-02",
-      status: "approved"
-    }
-  ];
+const Skeleton = ({ className = '' }) => (
+	<div className={'animate-pulse bg-slate-200 rounded-md ' + className} />
+)
 
-  const tabs = [
-    { key: "projects", label: "Projects" },
-    { key: "team", label: "Team" },
-    { key: "vacations", label: "My vacations" },
-  ];
+/* -------------------- API config -------------------- */
+const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+const INFO_USERS_URL = `${API_BASE}/info-Users`
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Main Container */}
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-          <button className="p-2 text-slate-400 hover:text-slate-600">
-            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
+const REFRESH_ENDPOINTS = [
+	`${API_BASE}/auth/refresh`,
+	`${API_BASE}/auth/refresh-token`,
+	`${API_BASE}/auth/refresh_token`,
+	`${API_BASE}/auth/refreshToken`,
+]
 
-        {/* Main Layout - Flex Side by Side */}
-        <div className="flex gap-6">
-          {/* Left Sidebar - Profile Info */}
-          <div className="w-80 flex-shrink-0">
-            <div className="bg-white rounded-xl p-6">
-              {/* Profile Avatar and Basic Info */}
-              <div className="text-center mb-6">
-                <div className="relative inline-block">
-                  <Avatar src={me?.image} alt={me?.full_name} size={80} />
-                  <button className="absolute -top-1 -right-1 p-1 bg-white rounded-full shadow-sm border border-slate-200 text-slate-400 hover:text-slate-600">
-                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                  </button>
-                </div>
-                <h3 className="font-semibold text-slate-900 text-lg mt-3">{safe(me?.full_name)}</h3>
-                <p className="text-slate-500 text-sm">{safe(me?.role)}</p>
-              </div>
+/* -------------------- Token helpers -------------------- */
+function getTokensFromUrl() {
+	try {
+		const params = new URLSearchParams(window.location.search)
+		const access = params.get('accessToken') || params.get('access_token')
+		const refresh = params.get('refreshToken') || params.get('refresh_token')
+		return { access, refresh }
+	} catch {
+		return { access: null, refresh: null }
+	}
+}
 
-              {/* Main Info Section */}
-              <div className="mb-6">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Main info</h4>
-                <div className="space-y-3">
-                  <KV label="Position" value={me?.position} />
-                  <KV label="Company" value={me?.company} />
-                  <KV label="Location" value={me?.location} />
-                  <KV label="Birthday Date" value={humanDate(me?.birth_date)} />
-                </div>
-              </div>
 
-              {/* Contact Info Section */}
-              <div>
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Contact Info</h4>
-                <div className="space-y-3">
-                  <KV label="Email" value={me?.email} />
-                  <KV label="Mobile Number" value={me?.phone} />
-                  <KV label="Skype" value={me?.skype} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Content Area */}
-          <div className="flex-1">
-            {/* Tabs and Filter */}
-            <div className="flex items-center justify-between mb-6">
-              <Tabs items={tabs} active={tab} onChange={setTab} />
-              {tab === "projects" && (
-                <div className="flex items-center gap-3">
-                  <button className="p-2 text-slate-400 hover:text-slate-600">
-                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  <select className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-600">
-                    <option>Current Projects</option>
-                  </select>
-                </div>
-              )}
-              {tab === "vacations" && (
-                <button className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  Add Request
-                </button>
-              )}
-            </div>
-
-            {/* Projects Tab */}
-            {tab === "projects" && (
-              <div className="space-y-4">
-                {me.projects.map((p) => (
-                  <div key={p.id} className="bg-white rounded-xl p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
-                        <div
-                          className={`w-12 h-12 rounded-lg flex-shrink-0 ${p.id === 1 ? 'bg-gradient-to-br from-pink-400 to-purple-500' :
-                            p.id === 2 ? 'bg-gradient-to-br from-orange-400 to-red-500' :
-                              'bg-gradient-to-br from-blue-400 to-indigo-500'
-                            }`}
-                        />
-                        <div>
-                          <div className="text-sm text-slate-500 mb-1">{p.code}</div>
-                          <h3 className="font-semibold text-slate-900 text-lg mb-2">{p.name}</h3>
-                          <div className="text-sm text-slate-500 flex items-center gap-1 mb-3">
-                            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                            </svg>
-                            Created {humanDate(p.created_at)}
-                          </div>
-                          {p.priority && (
-                            <div className="flex items-center gap-2">
-                              <svg className="w-4 h-4 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                              <Chip tone={p.priority}>{p.priority.charAt(0).toUpperCase() + p.priority.slice(1)}</Chip>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-slate-900 mb-3">Project Data</div>
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center justify-between gap-8">
-                            <span className="text-sm text-slate-500">All tasks</span>
-                            <span className="text-sm font-semibold text-slate-900">{p.tasks_total}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-8">
-                            <span className="text-sm text-slate-500">Active tasks</span>
-                            <span className="text-sm font-semibold text-slate-900">{p.tasks_active}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <span className="text-sm text-slate-500">Assignees</span>
-                          <div className="flex -space-x-1">
-                            {p.assignees.slice(0, 4).map((user, idx) => (
-                              <Avatar key={idx} src={user.image} alt={user.name} size={24} />
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Team Tab */}
-            {tab === "team" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {team.map((member) => (
-                  <div key={member.id} className="bg-white rounded-xl p-6 text-center">
-                    <Avatar src={member.image} alt={member.full_name} size={64} />
-                    <h3 className="font-semibold text-slate-900 mt-4">{member.full_name}</h3>
-                    <p className="text-sm text-slate-500 mb-3">{member.role}</p>
-                    {member.level && (
-                      <Chip>{member.level}</Chip>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Vacations Tab */}
-            {tab === "vacations" && (
-              <div className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-xl p-6 text-center">
-                    <div className="text-3xl font-bold text-blue-500 mb-2">{me.vacation_days}</div>
-                    <div className="text-sm font-medium text-slate-900 mb-1">Vacation</div>
-                    <div className="text-xs text-slate-400">12/15 days available</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-6 text-center">
-                    <div className="text-3xl font-bold text-red-500 mb-2">{me.sick_days}</div>
-                    <div className="text-sm font-medium text-slate-900 mb-1">Sick Leave</div>
-                    <div className="text-xs text-slate-400">6/12 days available</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-6 text-center">
-                    <div className="text-3xl font-bold text-purple-500 mb-2">{me.remote_days}</div>
-                    <div className="text-sm font-medium text-slate-900 mb-1">Work remotely</div>
-                    <div className="text-xs text-slate-400">42/50 days available</div>
-                  </div>
-                </div>
-
-                {/* Requests Table */}
-                <div className="bg-white rounded-xl p-6">
-                  <h3 className="font-semibold text-slate-900 mb-4">My Requests</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="text-sm text-slate-500 border-b border-slate-100">
-                          <th className="text-left py-3">Request Type</th>
-                          <th className="text-left py-3">Duration</th>
-                          <th className="text-left py-3">Start Day</th>
-                          <th className="text-left py-3">End Day</th>
-                          <th className="text-left py-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {vacationRequests.map((req) => (
-                          <tr key={req.id} className="border-b border-slate-50">
-                            <td className="py-4">
-                              <div className="flex items-center gap-3">
-                                <span className={`w-3 h-3 rounded-full ${req.type === 'Sick Leave' ? 'bg-red-500' :
-                                  req.type === 'Work remotely' ? 'bg-purple-500' : 'bg-blue-500'
-                                  }`} />
-                                <span className="text-sm font-medium text-slate-900">{req.type}</span>
-                              </div>
-                            </td>
-                            <td className="py-4 text-sm text-slate-600">{req.duration} days</td>
-                            <td className="py-4 text-sm text-slate-600">{humanDate(req.start_date)}</td>
-                            <td className="py-4 text-sm text-slate-600">{humanDate(req.end_date)}</td>
-                            <td className="py-4">
-                              <Chip tone={req.status}>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</Chip>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+function mergeAndDispatchTokens(dispatch, currentUser, newAccess, newRefresh) {
+  dispatch(
+    setCredentials({
+      user: currentUser || null,
+      accessToken: newAccess ?? null,
+      refreshToken: newRefresh ?? null,
+    })
   );
+  if (newAccess) localStorage.setItem("accessToken", newAccess);
+  if (newRefresh) localStorage.setItem("refreshToken", newRefresh);
+  if (!newAccess) localStorage.removeItem("accessToken");
+  if (!newRefresh) localStorage.removeItem("refreshToken");
+}
+
+/* -------------------- Refresh flow -------------------- */
+function buildRefreshAttempts(refreshToken) {
+  return [
+    { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken }) },
+    { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: refreshToken }) },
+    { headers: { "Content-Type": "application/json", "x-refresh-token": refreshToken }, body: JSON.stringify({}) },
+  ];
+}
+function extractTokens(obj) {
+  if (!obj || typeof obj !== "object") return {};
+  const access =
+    obj.accessToken || obj.access_token || obj.token || obj?.data?.accessToken || obj?.data?.access_token;
+  const refresh =
+    obj.refreshToken || obj.refresh_token || obj?.data?.refreshToken || obj?.data?.refresh_token;
+  return { access, refresh };
+}
+
+async function tryRefreshOnceCorsSafe({ refreshToken }) {
+  if (!refreshToken) throw new Error("Refresh token yo‘q");
+  let lastErr;
+  for (const url of REFRESH_ENDPOINTS) {
+    for (const attempt of buildRefreshAttempts(refreshToken)) {
+      try {
+        const res = await fetch(url, { method: "POST", headers: attempt.headers, body: attempt.body });
+        if (!res.ok) {
+          if (res.status === 404) {
+            lastErr = new Error(`404 at ${url}`);
+            continue;
+          }
+          let msg = `Refresh failed (${res.status})`;
+          try {
+            const j = await res.json();
+            msg = j?.message || msg;
+          } catch {}
+          lastErr = new Error(msg);
+          continue;
+        }
+        const data = await res.json().catch(() => ({}));
+        const { access, refresh } = extractTokens(data);
+        if (!access && !refresh) {
+          lastErr = new Error("Refresh javobida token topilmadi");
+          continue;
+        }
+        return { accessToken: access || null, refreshToken: refresh || null };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+  }
+  throw lastErr || new Error("Refresh muvaffaqiyatsiz");
+}
+
+/* -------------------- authFetch -------------------- */
+async function authFetch(
+  input,
+  options = {},
+  { retryOn401 = true, accessToken, refreshToken, onRefreshOk, onRefreshFail } = {}
+) {
+  const headers = new Headers(options.headers || {});
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  let res = await fetch(input, { ...options, headers });
+  if (res.status !== 401 || !retryOn401) return res;
+
+  try {
+    const refreshed = await tryRefreshOnceCorsSafe({ refreshToken });
+    onRefreshOk?.(refreshed);
+  } catch {
+    onRefreshFail?.();
+    throw new Error("Sessiya tugadi, iltimos qayta kiring");
+  }
+
+  const headers2 = new Headers(options.headers || {});
+  const latestAccess = localStorage.getItem("accessToken");
+  if (latestAccess) headers2.set("Authorization", `Bearer ${latestAccess}`);
+  res = await fetch(input, { ...options, headers: headers2 });
+  return res;
+}
+
+/* -------------------- Session info -------------------- */
+const buildSessionInfo = (access) => {
+  const role = (localStorage.getItem("role") || "mentor").toLowerCase();
+  const teacherId =
+    localStorage.getItem("teacher_id") ||
+    localStorage.getItem("teacherId") ||
+    localStorage.getItem("mentor_teacher_id") ||
+    null;
+
+  let email =
+    localStorage.getItem("email") ||
+    localStorage.getItem("userEmail") ||
+    localStorage.getItem("mentor_email") ||
+    null;
+
+
+  if (!email && access && access.split(".").length === 3) {
+    try {
+      const payload = JSON.parse(atob(access.split(".")[1]));
+      email = payload?.email || payload?.user?.email || email;
+    } catch {}
+  }
+  return { role, teacherId, email: email ? String(email).toLowerCase() : null };
 };
 
-export default Sozlamalar;
+/* -------------------- Component -------------------- */
+const Sozlamalar = () => {
+	const navigate = useNavigate()
+	const dispatch = useDispatch()
+
+	// Redux persisted auth
+	const reduxUser = useSelector(s => s?.auth?.user) || null
+	const reduxAccess = useSelector(s => s?.auth?.accessToken) || null
+	const reduxRefresh = useSelector(s => s?.auth?.refreshToken) || null
+
+	// URL tokens -> Redux/LS
+	useEffect(() => {
+		const { access, refresh } = getTokensFromUrl()
+		if (access || refresh) {
+			mergeAndDispatchTokens(
+				dispatch,
+				reduxUser,
+				access || reduxAccess,
+				refresh || reduxRefresh
+			)
+		}
+	}, []) // eslint-disable-line
+
+	const accessToken =
+		useSelector(s => s?.auth?.accessToken) ||
+		localStorage.getItem('accessToken')
+	const refreshToken =
+		useSelector(s => s?.auth?.refreshToken) ||
+		localStorage.getItem('refreshToken')
+
+	const session = useMemo(() => buildSessionInfo(accessToken), [accessToken])
+
+	const [tab, setTab] = useState('info')
+	const [currentUser, setCurrentUser] = useState(null)
+	const [allUsers, setAllUsers] = useState([])
+	const [loading, setLoading] = useState(true)
+	const [needsAuth, setNeedsAuth] = useState(false)
+	const [error, setError] = useState(null)
+
+	const onRefreshOk = useCallback(
+		({ accessToken: newAccess, refreshToken: newRefresh }) => {
+			mergeAndDispatchTokens(
+				dispatch,
+				reduxUser,
+				newAccess ?? accessToken,
+				newRefresh ?? refreshToken
+			)
+		},
+		[dispatch, reduxUser, accessToken, refreshToken]
+	)
+
+	const onRefreshFail = useCallback(() => {
+		dispatch(logout())
+		localStorage.removeItem('accessToken')
+		localStorage.removeItem('refreshToken')
+		setNeedsAuth(true)
+	}, [dispatch])
+
+	const fetchInfoUsers = useCallback(
+		async signal => {
+			const res = await authFetch(
+				INFO_USERS_URL,
+				{ method: 'GET', signal },
+				{
+					retryOn401: true,
+					accessToken,
+					refreshToken,
+					onRefreshOk,
+					onRefreshFail,
+				}
+			)
+			if (!res.ok) {
+				const j = await res.json().catch(() => ({}))
+				throw new Error(
+					j?.message || `Ma'lumotlarni yuklashda xatolik: ${res.status}`
+				)
+			}
+			const data = await res.json().catch(() => ({}))
+			return Array.isArray(data?.infoUsers) ? data.infoUsers : []
+		},
+		[accessToken, refreshToken, onRefreshOk, onRefreshFail]
+	)
+
+	const load = useCallback(
+		async signal => {
+			try {
+				setLoading(true)
+				setError(null)
+				setNeedsAuth(false)
+
+				const a = accessToken
+				const r = refreshToken
+				if (!a && !r) {
+					setNeedsAuth(true)
+					setLoading(false)
+					return
+				}
+
+				if (!a && r) {
+					try {
+						const refreshed = await tryRefreshOnceCorsSafe({ refreshToken: r })
+						onRefreshOk(refreshed)
+					} catch {
+						onRefreshFail()
+						setLoading(false)
+						return
+					}
+				}
+
+				const list = await fetchInfoUsers(signal)
+
+				const me =
+					list.find(
+						u =>
+							(session.teacherId && u?.teacher_id === session.teacherId) ||
+							(session.email &&
+								u?.email &&
+								String(u.email).toLowerCase() === session.email)
+					) ||
+					list[0] ||
+					null
+
+				setCurrentUser(me)
+				if (session.role === 'admin' || session.role === 'superadmin') {
+					setAllUsers(list)
+				} else {
+					setAllUsers([])
+				}
+				setLoading(false)
+			} catch (err) {
+				console.error('Fetch data error:', err.message)
+				setError(err.message || 'Xatolik yuz berdi')
+				setLoading(false)
+			}
+		},
+		[
+			accessToken,
+			refreshToken,
+			session.teacherId,
+			session.email,
+			session.role,
+			fetchInfoUsers,
+			onRefreshOk,
+			onRefreshFail,
+		]
+	)
+
+	useEffect(() => {
+		const ctrl = new AbortController()
+		load(ctrl.signal)
+		return () => ctrl.abort()
+	}, [load])
+
+	const onManualRefresh = useCallback(() => {
+		const ctrl = new AbortController()
+		load(ctrl.signal)
+	}, [load])
+
+	const getFullName = user => {
+		if (!user) return '-'
+		if (user.fullName) return user.fullName
+		if (user.firstname || user.lastname) {
+			return `${user.firstname || ''} ${user.lastname || ''}`.trim() || '-'
+		}
+		return '-'
+	}
+
+	const tabs = useMemo(
+		() => [
+			{ key: 'info', label: "Ma'lumotlar" },
+			...(session.role === 'admin' || session.role === 'superadmin'
+				? [{ key: 'team', label: 'Barcha Mentorlar' }]
+				: []),
+		],
+		[session.role]
+	)
+
+	const renderGender = g => {
+		if (!g) return '-'
+		const v = String(g).toLowerCase()
+		if (v === 'erkak' || v === 'male' || v === 'm') return 'Erkak'
+		if (v === 'ayol' || v === 'female' || v === 'f') return 'Ayol'
+		return g
+	}
+
+	return (
+		<div className='min-h-screen bg-gradient-to-b from-white to-slate-50'>
+			{/* Top brand bar */}
+			<div
+				className='h-1 w-full'
+				style={{ backgroundImage: `linear-gradient(90deg, ${BRAND}, #5ca6f7)` }}
+			/>
+
+			<div className='max-w-7xl mx-auto p-6'>
+				{/* Header */}
+				<div className='flex items-center justify-between mb-6'>
+					<div className='flex items-center gap-3'>
+						<div className='w-9 h-9 rounded-xl bg-gradient-to-br from-[#1777C9] to-[#6ea8ff] grid place-items-center text-white font-bold shadow-[0_10px_24px_-10px_rgba(23,119,201,.9)]'>
+							S
+						</div>
+						<div>
+							<h1 className='text-2xl font-bold text-slate-900'>Sozlamalar</h1>
+							<p className='text-slate-500 text-sm'>
+								Mentor profili va jamoa ma’lumotlari
+							</p>
+						</div>
+					</div>
+
+					<div className='flex items-center gap-2'>
+						<IconBtn title='Yangilash' onClick={onManualRefresh}>
+							<svg className='w-5 h-5' viewBox='0 0 20 20' fill='currentColor'>
+								<path
+									fillRule='evenodd'
+									d='M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z'
+									clipRule='evenodd'
+								/>
+							</svg>
+						</IconBtn>
+						<IconBtn title='Sozlamalar'>
+							<svg className='w-5 h-5' viewBox='0 0 20 20' fill='currentColor'>
+								<path
+									fillRule='evenodd'
+									d='M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z'
+									clipRule='evenodd'
+								/>
+							</svg>
+						</IconBtn>
+					</div>
+				</div>
+
+				{/* Tabs */}
+				<div className='mb-6'>
+					<PillTabs items={tabs} active={tab} onChange={setTab} />
+				</div>
+
+				{/* States */}
+				{needsAuth ? (
+					<Card className='p-8 text-center'>
+						<p className='text-slate-900 font-semibold mb-2'>
+							Kirish talab qilinadi
+						</p>
+						<p className='text-slate-500 text-sm mb-6'>
+							Davom etish uchun tizimga kiring. Agar sizda havola orqali
+							tokenlar kelishi kerak bo‘lsa, URL’ga{' '}
+							<code className='px-1 py-0.5 bg-slate-100 rounded'>
+								?accessToken=...&amp;refreshToken=...
+							</code>{' '}
+							qo‘shib yuboring.
+						</p>
+						<div className='flex items-center gap-3 justify-center'>
+							<PrimaryBtn onClick={() => navigate('/login')}>
+								Login sahifasiga o‘tish
+							</PrimaryBtn>
+							<GhostBtn onClick={onManualRefresh}>Qayta tekshirish</GhostBtn>
+						</div>
+					</Card>
+				) : loading ? (
+					<div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+						<Card className='p-6'>
+							<div className='flex flex-col items-center'>
+								<Skeleton className='w-20 h-20 rounded-full mb-4' />
+								<Skeleton className='w-40 h-4 mb-2' />
+								<Skeleton className='w-24 h-3 mb-6' />
+								<div className='w-full space-y-3'>
+									{Array.from({ length: 6 }).map((_, i) => (
+										<Skeleton key={i} className='w-full h-3' />
+									))}
+								</div>
+							</div>
+						</Card>
+						<Card className='p-6 md:col-span-2'>
+							<Skeleton className='w-48 h-4 mb-6' />
+							<div className='grid grid-cols-2 gap-6'>
+								{Array.from({ length: 10 }).map((_, i) => (
+									<Skeleton key={i} className='w-full h-6' />
+								))}
+							</div>
+						</Card>
+					</div>
+				) : error ? (
+					<Card className='p-6 border-red-200 bg-red-50/70'>
+						<div className='text-center'>
+							<p className='text-red-600 mb-4'>Xatolik: {error}</p>
+							<PrimaryBtn
+								onClick={onManualRefresh}
+								className='bg-red-500 hover:bg-red-600 shadow-none'
+							>
+								Qayta urinish
+							</PrimaryBtn>
+						</div>
+					</Card>
+				) : !currentUser ? (
+					<Card className='p-6 border-yellow-200 bg-yellow-50/70'>
+						<p className='text-yellow-700 text-center'>Ma'lumot topilmadi</p>
+					</Card>
+				) : (
+					<>
+						{/* Info */}
+						{tab === 'info' && (
+							<div className='flex flex-col lg:flex-row gap-6'>
+								{/* Left */}
+								<div className='lg:w-80 shrink-0'>
+									<Card className='p-6'>
+										<div className='text-center mb-6'>
+											<div className='relative inline-block'>
+												<Avatar
+													src={currentUser.imgURL}
+													alt={getFullName(currentUser)}
+													size={88}
+												/>
+												{/* online dot */}
+												<span className='absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white grid place-items-center'>
+													<span className='w-3.5 h-3.5 rounded-full bg-[#22c55e]' />
+												</span>
+											</div>
+											<h3 className='font-semibold text-slate-900 text-lg mt-3'>
+												{getFullName(currentUser)}
+											</h3>
+											<p className='text-slate-500 text-sm'>
+												{safe(currentUser.position)}
+											</p>
+											<p className='text-slate-400 text-xs mt-1'>
+												{safe(currentUser.teacher_id)}
+											</p>
+										</div>
+
+										<div className='mb-6'>
+											<h4 className='font-semibold text-slate-900 mb-3 text-sm'>
+												Asosiy ma'lumotlar
+											</h4>
+											<div className='space-y-3'>
+												<KV label='Lavozim' value={currentUser.position} />
+												<KV label='Kompaniya' value={currentUser.company} />
+												<KV label='Joylashuv' value={currentUser.location} />
+												<KV
+													label="Tug'ilgan sana"
+													value={humanDate(currentUser.date_of_birth)}
+												/>
+												<KV
+													label='Jinsi'
+													value={renderGender(currentUser.gender)}
+												/>
+											</div>
+										</div>
+
+										<div className='mb-6'>
+											<h4 className='font-semibold text-slate-900 mb-3 text-sm'>
+												Kontakt ma'lumotlari
+											</h4>
+											<div className='space-y-3'>
+												<KV label='Email' value={currentUser.email} />
+												<KV label='Telefon' value={currentUser.phone} />
+												<KV label='Skype' value={currentUser.skype_username} />
+											</div>
+										</div>
+
+										<div>
+											<h4 className='font-semibold text-slate-900 mb-3 text-sm'>
+												Tizim ma'lumotlari
+											</h4>
+											<div className='space-y-3'>
+												<KV label='ID' value={currentUser._id} />
+												<KV label='Teacher ID' value={currentUser.teacher_id} />
+												<KV
+													label="Qo'shilgan sana"
+													value={humanDate(currentUser.createdAt)}
+												/>
+												<KV
+													label='Yangilangan sana'
+													value={humanDate(currentUser.updatedAt)}
+												/>
+											</div>
+										</div>
+									</Card>
+								</div>
+
+								{/* Right */}
+								<div className='flex-1'>
+									<Card className='p-6'>
+										<div className='flex items-center justify-between mb-4'>
+											<h3 className='font-semibold text-slate-900 text-lg'>
+												To'liq ma'lumotlar
+											</h3>
+											<a
+												className='text-sm text-[#1777C9] hover:underline'
+												href={currentUser.imgURL || '#'}
+												target='_blank'
+												rel='noreferrer'
+											>
+												Profil rasmini ko‘rish
+											</a>
+										</div>
+
+										<div className='grid grid-cols-1 sm:grid-cols-2 gap-6'>
+											<InfoItem
+												label="To'liq ismi"
+												value={getFullName(currentUser)}
+											/>
+											<InfoItem
+												label='Lavozim'
+												value={safe(currentUser.position)}
+											/>
+											<InfoItem
+												label='Kompaniya'
+												value={safe(currentUser.company)}
+											/>
+											<InfoItem
+												label='Joylashuv'
+												value={safe(currentUser.location)}
+											/>
+											<InfoItem label='Email' value={safe(currentUser.email)} />
+											<InfoItem
+												label='Telefon'
+												value={safe(currentUser.phone)}
+											/>
+											<InfoItem
+												label='Skype'
+												value={safe(currentUser.skype_username)}
+											/>
+											<InfoItem
+												label='Jinsi'
+												value={renderGender(currentUser.gender)}
+											/>
+											<InfoItem
+												label="Tug'ilgan sana"
+												value={humanDate(currentUser.date_of_birth)}
+											/>
+											<InfoItem
+												label='Teacher ID'
+												value={safe(currentUser.teacher_id)}
+											/>
+											<div className='sm:col-span-2'>
+												<InfoItem
+													label='Database ID'
+													value={safe(currentUser._id)}
+													mono
+												/>
+											</div>
+											<InfoItem
+												label="Qo'shilgan sana"
+												value={humanDate(currentUser.createdAt)}
+											/>
+											<InfoItem
+												label='Yangilangan sana'
+												value={humanDate(currentUser.updatedAt)}
+											/>
+										</div>
+									</Card>
+								</div>
+							</div>
+						)}
+
+						{/* Team */}
+						{tab === 'team' &&
+							(session.role === 'admin' || session.role === 'superadmin') && (
+								<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'>
+									{allUsers.map(user => (
+										<Card
+											key={user._id}
+											className='p-6 hover:shadow-[0_16px_40px_-20px_rgba(23,119,201,.45)] hover:border-[#1777C9]/30 transition'
+										>
+											<div className='text-center'>
+												<Avatar
+													src={user.imgURL}
+													alt={getFullName(user)}
+													size={64}
+												/>
+												<h3 className='font-semibold text-slate-900 mt-4'>
+													{getFullName(user)}
+												</h3>
+												<p className='text-sm text-slate-500 mb-1'>
+													{safe(user.position)}
+												</p>
+												<p className='text-xs text-slate-400'>
+													{safe(user.teacher_id)}
+												</p>
+
+												<div className='space-y-2 text-left mt-4 pt-4 border-t border-slate-100'>
+													<Row label='Kompaniya' value={safe(user.company)} />
+													<Row label='Joylashuv' value={safe(user.location)} />
+													<Row
+														label='Email'
+														value={safe(user.email)}
+														truncate
+													/>
+													<Row label='Telefon' value={safe(user.phone)} />
+												</div>
+											</div>
+										</Card>
+									))}
+								</div>
+							)}
+					</>
+				)}
+			</div>
+		</div>
+	)
+}
+
+/* --------- small presentational atoms --------- */
+const InfoItem = ({ label, value, mono = false }) => (
+	<div>
+		<div className='text-sm text-slate-500 mb-1'>{label}</div>
+		<div
+			className={
+				'text-slate-900 font-medium ' +
+				(mono ? 'text-xs font-mono break-all' : '')
+			}
+		>
+			{value}
+		</div>
+	</div>
+)
+
+const Row = ({ label, value, truncate }) => (
+	<div className='flex items-center justify-between gap-2 text-xs'>
+		<span className='text-slate-500'>{label}:</span>
+		<span
+			className={
+				'text-slate-900 font-medium ' +
+				(truncate ? 'truncate max-w-[160px]' : '')
+			}
+		>
+			{value}
+		</span>
+	</div>
+)
+
+export default Sozlamalar
+ 

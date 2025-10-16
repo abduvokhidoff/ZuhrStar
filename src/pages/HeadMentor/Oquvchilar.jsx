@@ -1180,8 +1180,7 @@ const Oquvchilar = () => {
 
 										<div className='col-span-3 flex items-center'>
 											<div className='w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-700 mr-3'>
-												{student.status === 'muzlagan' ? <Snowflake className='w-10 h-5' /> : {student.name?.charAt(0) || ''}
-												{student.surname?.charAt(0) || ''}}
+												{student.name?.charAt(0)}
 											</div>
 											<span className='font-medium text-gray-900'>
 												{student.name} {student.surname}

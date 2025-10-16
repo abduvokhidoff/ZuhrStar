@@ -38,6 +38,32 @@ const niceStudent = (s) => {
   return { ...s, name };
 };
 
+/* --- Days config (boolean) --- */
+const getDaysConfig = (g) => {
+  const d = g?.days || {};
+  return {
+    odd: !!d.odd_days,     // toq kunlar
+    even: !!d.even_days,   // juft kunlar
+    every: !!d.every_days, // har kuni
+  };
+};
+
+const isClassDay = (dayNumber, group) => {
+  const cfg = getDaysConfig(group);
+  if (cfg.every) return true;                      // har kuni
+  if (cfg.odd && dayNumber % 2 === 1) return true; // toq: 1,3,5,...
+  if (cfg.even && dayNumber % 2 === 0) return true;// juft: 2,4,6,...
+  return false;                                    // belgilanmagan: dars yo‘q
+};
+
+const daysBadge = (g) => {
+  const cfg = getDaysConfig(g);
+  if (cfg.every) return "Har kuni";
+  if (cfg.odd) return "Toq kunlar";
+  if (cfg.even) return "Juft kunlar";
+  return "Kun belgilanmagan";
+};
+
 /* ---------- Component ---------- */
 export default function Guruhlar() {
 	const dispatch = useDispatch()
@@ -72,6 +98,7 @@ export default function Guruhlar() {
 
 	const [attendance, setAttendance] = useState({})
 	const [showOptions, setShowOptions] = useState(null)
+	const [hoveredCell, setHoveredCell] = useState(null)
 
 	const [currentTeacherName, setCurrentTeacherName] = useState(
 		teacherNameRedux || ''
@@ -108,6 +135,7 @@ export default function Guruhlar() {
 					month: '2-digit',
 				}),
 				dayName: d.toLocaleDateString('uz-UZ', { weekday: 'short' }),
+				dayOfWeek: d.getDay(), // 0 = yakshanba, 1 = dushanba, ..., 6 = shanba
 			}
 		})
 	}, [])
@@ -115,6 +143,13 @@ export default function Guruhlar() {
 		month: 'long',
 		year: 'numeric',
 	})
+
+	// Faqat dars kunlarini ko'rsatish uchun
+	const classDays = useMemo(() => {
+		if (!selectedGroup) return monthDays
+
+		return monthDays.filter(d => isClassDay(d.day, selectedGroup))
+	}, [monthDays, selectedGroup])
 
 	/* ---- Auth fetch + refresh (ixcham) ---- */
 	const refreshAccessToken = useCallback(async () => {
@@ -206,9 +241,17 @@ export default function Guruhlar() {
 			}
 			setLoading(p => ({ ...p, attendance: true }))
 			try {
+				console.log('Loading attendance for group:', g)
+				console.log('Date range:', {
+					start: startOfMonthISO,
+					end: endOfMonthISO,
+				})
+
 				const data = await authFetch(
 					`${API_BASE}/Attendance?group_id=${g}&start_date=${startOfMonthISO}&end_date=${endOfMonthISO}`
 				)
+				console.log('Attendance API response:', data)
+
 				const map = {}
 				if (Array.isArray(data)) {
 					data.forEach(r => {
@@ -218,7 +261,10 @@ export default function Guruhlar() {
 							: 'absent'
 					})
 				}
+				console.log('Processed attendance map:', map)
 				setAttendance(map)
+			} catch (error) {
+				console.error('Error loading attendance:', error)
 			} finally {
 				setLoading(p => ({ ...p, attendance: false }))
 			}
@@ -290,27 +336,46 @@ export default function Guruhlar() {
 		await loadAttendance(g)
 	}
 
+	// Endi faqat dars kunlari ko'rsatiladi, shuning uchun har doim backendga yozamiz
 	const quickToggle = async (studentId, day) => {
 		const g = gid(selectedGroup)
 		if (!g) return
+
 		const k = attKey(g, studentId, day)
 		const next = attendance[k] === 'present' ? 'absent' : 'present'
 		const prev = attendance[k] ?? null
+
+		console.log('Quick toggle:', {
+			groupId: g,
+			studentId,
+			day,
+			current: attendance[k],
+			next,
+		})
+
 		try {
 			setAttendance(p => ({ ...p, [k]: next }))
 			const now = new Date()
 			const d = new Date(now.getFullYear(), now.getMonth(), Number(day))
 			d.setHours(8, 30, 0, 0)
-			await authFetch(`${API_BASE}/Attendance`, {
+
+			const payload = {
+				date: d.toISOString(),
+				group_id: g,
+				student_id: String(studentId),
+				status: next === 'present',
+			}
+
+			console.log('Attendance POST payload:', payload)
+
+			const response = await authFetch(`${API_BASE}/Attendance`, {
 				method: 'POST',
-				body: JSON.stringify({
-					date: d.toISOString(),
-					group_id: g,
-					student_id: String(studentId),
-					status: next === 'present',
-				}),
+				body: JSON.stringify(payload),
 			})
+
+			console.log('Attendance POST response:', response)
 		} catch (e) {
+			console.error('Attendance POST error:', e)
 			setAttendance(p => ({ ...p, [k]: prev }))
 			setError(`Davomatni saqlashda xatolik: ${e.message || e}`)
 		}
@@ -318,8 +383,46 @@ export default function Guruhlar() {
 
 	const goDarsJadvali = () => {
 		if (!selectedGroup) return
-		// Muhim: state orqali tanlangan guruhni yuboramiz
 		navigate('dars-jadvali', { state: { group: selectedGroup } })
+	}
+
+	// Yangi attendance belgilash funksiyasi
+	const markAttendance = async (studentId, day, status) => {
+		const g = gid(selectedGroup)
+		if (!g) return
+
+		const k = attKey(g, studentId, day)
+		const prev = attendance[k] ?? null
+
+		console.log('Mark attendance:', { groupId: g, studentId, day, status })
+
+		try {
+			setAttendance(p => ({ ...p, [k]: status }))
+			const now = new Date()
+			const d = new Date(now.getFullYear(), now.getMonth(), Number(day))
+			d.setHours(8, 30, 0, 0)
+
+			const payload = {
+				date: d.toISOString(),
+				group_id: g,
+				student_id: String(studentId),
+				status: status === 'present',
+			}
+
+			console.log('Attendance POST payload:', payload)
+
+			const response = await authFetch(`${API_BASE}/Attendance`, {
+				method: 'POST',
+				body: JSON.stringify(payload),
+			})
+
+			console.log('Attendance POST response:', response)
+			setShowOptions(null) // Options ni yopish
+		} catch (e) {
+			console.error('Attendance POST error:', e)
+			setAttendance(p => ({ ...p, [k]: prev }))
+			setError(`Davomatni saqlashda xatolik: ${e.message || e}`)
+		}
 	}
 
 	/* ---- Render ---- */
@@ -422,6 +525,9 @@ export default function Guruhlar() {
 															<Clock className='w-3 h-3' />{' '}
 															{g?.start_time ?? '--'}–{g?.end_time ?? '--'}
 														</span>
+														<span className='px-2 py-1 rounded bg-violet-100 text-violet-700 font-semibold'>
+															{daysBadge(g)}
+														</span>
 													</div>
 													<div className='flex items-center gap-2 text-xs text-gray-600'>
 														<span className='px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-semibold flex items-center gap-1'>
@@ -503,6 +609,12 @@ export default function Guruhlar() {
 							<div
 								className='overflow-x-auto'
 								onScroll={() => setShowOptions(null)}
+								onClick={e => {
+									// Agar katak emas, boshqa joyga bosilgan bo'lsa options ni yopish
+									if (!e.target.closest('[data-attendance-cell]')) {
+										setShowOptions(null)
+									}
+								}}
 							>
 								<div className='min-w-max'>
 									{/* header row */}
@@ -516,7 +628,7 @@ export default function Guruhlar() {
 											</div>
 										</div>
 
-										{monthDays.map(d => (
+										{classDays.map(d => (
 											<div
 												key={`hdr-${d.day}`}
 												className={`w-14 px-1 py-3 text-center border-r-2 h-16 flex-shrink-0
@@ -575,58 +687,78 @@ export default function Guruhlar() {
 														</div>
 													</div>
 
-													{monthDays.map(d => {
+													{classDays.map(d => {
 														const g = gid(selectedGroup)
 														const k = attKey(g, sid(s), d.day)
 														const status = attendance[k] || null
+														const classDay = isClassDay(d.day, selectedGroup)
+
+														// Endi faqat dars kunlari ko'rsatiladi, shuning uchun har doim classDay = true
+														const effectiveStatus = status || 'absent'
+
 														return (
 															<div
 																key={`c-${rowKey}-${d.day}`}
+																data-attendance-cell
 																className={`w-14 px-1 border-r-2 border-gray-100 relative flex items-center justify-center h-16 flex-shrink-0
                                   ${
 																		d.isWeekend ? 'bg-slate-50/50' : 'bg-white'
 																	}`}
+																title={`${d.dateLabel} – bosib davomatni belgilang`}
 															>
+																{/* Asosiy katak */}
 																<button
-																	onClick={() => quickToggle(sid(s), d.day)}
-																	onContextMenu={e => {
-																		e.preventDefault()
+																	onClick={() =>
 																		setShowOptions(k === showOptions ? null : k)
-																	}}
+																	}
 																	className={`w-10 h-10 rounded-xl text-sm font-black transition-all cursor-pointer ${getStatusCls(
-																		status
-																	)}`}
-																	title={`${d.dateLabel} – chap klik: tez belgilash, o‘ng klik: variantlar`}
+																		effectiveStatus
+																	)} hover:scale-105`}
 																>
-																	{status === 'present' && (
+																	{effectiveStatus === 'present' && (
 																		<Check className='w-5 h-5 mx-auto' />
 																	)}
-																	{status === 'absent' && (
+																	{effectiveStatus === 'absent' && (
 																		<X className='w-5 h-5 mx-auto' />
 																	)}
 																</button>
 
+																{/* Yuqorida ochiladigan 2ta tugma */}
 																{showOptions === k && (
-																	<div className='absolute -top-24 left-1/2 -translate-x-1/2 z-30'>
-																		<div className='bg-white rounded-2xl shadow border p-3 flex gap-3'>
+																	<div className='absolute -top-20 left-1/2 -translate-x-1/2 z-30'>
+																		<div className='bg-white rounded-2xl shadow-lg border border-gray-200 p-2 flex gap-2'>
+																			{/* Present tugmasi */}
 																			<button
 																				onClick={() =>
-																					quickToggle(sid(s), d.day)
-																				} // toggle
-																				className='w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-xl font-black shadow hover:scale-110 transition'
-																				title='Bor/Yo‘qni almashtirish'
+																					markAttendance(
+																						sid(s),
+																						d.day,
+																						'present'
+																					)
+																				}
+																				className='w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-xl font-black shadow hover:scale-110 transition-all duration-200 flex items-center justify-center'
+																				title='Bor'
 																			>
-																				<Check className='w-7 h-7 mx-auto' />
+																				<Check className='w-6 h-6' />
 																			</button>
+
+																			{/* Absent tugmasi */}
 																			<button
-																				onClick={() => setShowOptions(null)}
-																				className='w-14 h-14 bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl font-black shadow hover:scale-110 transition'
-																				title='Yopish'
+																				onClick={() =>
+																					markAttendance(
+																						sid(s),
+																						d.day,
+																						'absent'
+																					)
+																				}
+																				className='w-12 h-12 bg-gradient-to-br from-rose-500 to-red-600 text-white rounded-xl font-black shadow hover:scale-110 transition-all duration-200 flex items-center justify-center'
+																				title="Yo'q"
 																			>
-																				<X className='w-7 h-7 mx-auto text-gray-700' />
+																				<X className='w-6 h-6' />
 																			</button>
 																		</div>
-																		<div className='absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[10px] border-l-transparent border-r-transparent border-t-white' />
+																		{/* Ko'rsatkich uchburchagi */}
+																		<div className='absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white' />
 																	</div>
 																)}
 															</div>
