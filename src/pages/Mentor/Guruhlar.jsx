@@ -569,7 +569,7 @@ export default function Guruhlar() {
 																				<X className='w-5 h-5' />
 																			</button>
 																		</div>
-																		<div className='absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white' />
+																		<div className='absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white' />
 																	</div>
 																)}
 															</td>
