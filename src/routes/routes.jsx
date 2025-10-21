@@ -26,7 +26,8 @@ import AdminTolovlar from '../pages/Admin/Tolovlar'
 import AdminGuruhlar from '../pages/Admin/Guruhlar'
 import AdminGoogleMeet from '../pages/Admin/GoogleMeet'
 import AdminBildirishnomalar from '../pages/Admin/Bildirishnomalar'
-import AdminSozlamalar from '../pages/Admin/Sozlamalar'
+// import AdminSozlamalar from '../pages/Admin/Sozlamalar'
+import GroupStudents from "../pages/Admin/GroupStudents";
 
 import SuperAdminDashboard from '../pages/SuperAdmin/Dashboard'
 import SuperAdminStudents from '../pages/SuperAdmin/Students'
@@ -54,7 +55,7 @@ const routes = createHashRouter([
 		element: <LoginLayout />,
 	},
 
-	
+
 	{
 		path: '/',
 		element: <RoleBasedRoute />,
@@ -98,7 +99,8 @@ const routes = createHashRouter([
 					{ path: 'guruhlar', element: <AdminGuruhlar /> },
 					{ path: 'google-meet', element: <AdminGoogleMeet /> },
 					{ path: 'bildirishnomalar', element: <AdminBildirishnomalar /> },
-					{ path: 'sozlamalar', element: <AdminSozlamalar /> },
+					// { path: 'sozlamalar', element: <AdminSozlamalar /> },
+					{ path: 'guruhlar/:groupName/students', element: <GroupStudents />,}
 				],
 			},
 		],

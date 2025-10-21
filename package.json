@@ -25,7 +25,8 @@
     "recharts": "^3.1.0",
     "redax": "^0.0.0",
     "redux": "^5.0.1",
-    "redux-persist": "^6.0.0"
+    "redux-persist": "^6.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
