@@ -579,9 +579,9 @@ const Kurslar = () => {
 																	</select>
 																</div>
 															) : (
-																`{${kurs.duration} ${
+																`${kurs.duration} ${
 																	kurs.duration_type || 'oy'
-																}}`
+																}`
 															)}
 														</td>
 														<td className='px-6 py-4 whitespace-nowrap'>

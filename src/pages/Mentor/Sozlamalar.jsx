@@ -1,791 +1,342 @@
-// Sozlamalar.jsx (Tailwind-only, brand ko‘k: #1777C9)
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
-// ❗️ o'zingizdagi slice manzilini qo'ying
-// import { setCredentials, logout } from "@/store/authSlice";
+import React, { useState, useEffect, useCallback } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { setCredentials, logout } from "../../redux/authSlice";
 
-const BRAND = '#1777C9'
+const API = "https://zuhrstar-production.up.railway.app/api";
 
-/* -------------------- UI helpers -------------------- */
-const humanDate = d => {
-	try {
-		if (!d) return '-'
-		const dt = new Date(d)
-		if (Number.isNaN(dt.getTime())) return d
-		return dt.toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: '2-digit',
-		})
-	} catch {
-		return d || '-'
-	}
-}
-const safe = (v, f = '-') => (v === null || v === undefined || v === '' ? f : v)
+const Avatar = ({ src, alt, size = 80 }) => (
+  <div className="rounded-full overflow-hidden ring-4 ring-white shadow-lg" style={{ width: size, height: size }}>
+    {src ? <img src={src} alt={alt} className="w-full h-full object-cover" /> : 
+    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-300 flex items-center justify-center text-white text-2xl font-bold">
+      {alt?.[0]?.toUpperCase() || "?"}
+    </div>}
+  </div>
+);
 
-const Avatar = ({ src, alt, size = 56 }) => (
-	<div
-		className='rounded-full overflow-hidden ring-2 ring-white shadow-[0_8px_24px_-8px_rgba(2,6,23,.25)]'
-		style={{ width: size, height: size }}
-	>
-		{src ? (
-			<img
-				src={src}
-				alt={alt || 'avatar'}
-				className='w-full h-full object-cover'
-			/>
-		) : (
-			<div className='w-full h-full bg-gradient-to-br from-[#1777C9] to-[#6ea8ff]' />
-		)}
-	</div>
-)
+const Card = ({ children, className = "" }) => (
+  <div className={"bg-white rounded-3xl border border-slate-100 shadow-sm " + className}>{children}</div>
+);
 
-const PillTabs = ({ items, active, onChange }) => (
-	<div className='inline-flex rounded-2xl bg-white/70 backdrop-blur border border-slate-200 p-1 shadow-sm'>
-		{items.map(t => {
-			const isActive = active === t.key
-			return (
-				<button
-					key={t.key}
-					onClick={() => onChange(t.key)}
-					className={[
-						'px-4 py-2 rounded-xl text-sm font-medium transition',
-						isActive
-							? 'bg-[#1777C9] text-white shadow-[0_6px_18px_-6px_rgba(23,119,201,.7)]'
-							: 'text-slate-600 hover:text-slate-800 hover:bg-slate-100',
-					].join(' ')}
-				>
-					{t.label}
-				</button>
-			)
-		})}
-	</div>
-)
+const Input = ({ label, value }) => (
+  <div>
+    <label className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+    <input value={value || ""} readOnly className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm" />
+  </div>
+);
 
-const KV = ({ label, value }) => (
-	<div className='py-1'>
-		<div className='text-slate-500 text-[11px] mb-0.5'>{label}</div>
-		<div className='text-slate-900 text-[13px] font-medium break-all'>
-			{safe(value)}
-		</div>
-	</div>
-)
+const Select = ({ label, value }) => (
+  <div>
+    <label className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+    <div className="relative">
+      <select value={value || ""} disabled className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm appearance-none">
+        <option>{value || "Select"}</option>
+      </select>
+      <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </div>
+  </div>
+);
 
-const Card = ({ children, className = '' }) => (
-	<div
-		className={
-			'bg-white/80 backdrop-blur rounded-2xl border border-slate-200 shadow-[0_12px_30px_-12px_rgba(2,6,23,.2)] ' +
-			className
-		}
-	>
-		{children}
-	</div>
-)
+const Skeleton = ({ className = "" }) => <div className={"animate-pulse bg-slate-200 rounded " + className} />;
 
-const IconBtn = ({ title, onClick, children }) => (
-	<button
-		title={title}
-		onClick={onClick}
-		className='p-2 rounded-xl bg-white/80 hover:bg-white border border-slate-200 text-slate-500 hover:text-slate-700 transition shadow-sm'
-	>
-		{children}
-	</button>
-)
-
-const PrimaryBtn = ({ children, onClick, className = '' }) => (
-	<button
-		onClick={onClick}
-		className={
-			'px-4 py-2 rounded-xl text-white bg-[#1777C9] hover:bg-[#0f62a7] shadow-[0_10px_24px_-10px_rgba(23,119,201,.9)] transition ' +
-			className
-		}
-	>
-		{children}
-	</button>
-)
-
-const GhostBtn = ({ children, onClick }) => (
-	<button
-		onClick={onClick}
-		className='px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition'
-	>
-		{children}
-	</button>
-)
-
-const Skeleton = ({ className = '' }) => (
-	<div className={'animate-pulse bg-slate-200 rounded-md ' + className} />
-)
-
-/* -------------------- API config -------------------- */
-const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
-const INFO_USERS_URL = `${API_BASE}/info-Users`
-
-const REFRESH_ENDPOINTS = [
-	`${API_BASE}/auth/refresh`,
-	`${API_BASE}/auth/refresh-token`,
-	`${API_BASE}/auth/refresh_token`,
-	`${API_BASE}/auth/refreshToken`,
-]
-
-/* -------------------- Token helpers -------------------- */
-function getTokensFromUrl() {
-	try {
-		const params = new URLSearchParams(window.location.search)
-		const access = params.get('accessToken') || params.get('access_token')
-		const refresh = params.get('refreshToken') || params.get('refresh_token')
-		return { access, refresh }
-	} catch {
-		return { access: null, refresh: null }
-	}
-}
-
-
-function mergeAndDispatchTokens(dispatch, currentUser, newAccess, newRefresh) {
-  dispatch(
-    setCredentials({
-      user: currentUser || null,
-      accessToken: newAccess ?? null,
-      refreshToken: newRefresh ?? null,
-    })
-  );
-  if (newAccess) localStorage.setItem("accessToken", newAccess);
-  if (newRefresh) localStorage.setItem("refreshToken", newRefresh);
-  if (!newAccess) localStorage.removeItem("accessToken");
-  if (!newRefresh) localStorage.removeItem("refreshToken");
-}
-
-/* -------------------- Refresh flow -------------------- */
-function buildRefreshAttempts(refreshToken) {
-  return [
-    { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken }) },
-    { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: refreshToken }) },
-    { headers: { "Content-Type": "application/json", "x-refresh-token": refreshToken }, body: JSON.stringify({}) },
-  ];
-}
-function extractTokens(obj) {
-  if (!obj || typeof obj !== "object") return {};
-  const access =
-    obj.accessToken || obj.access_token || obj.token || obj?.data?.accessToken || obj?.data?.access_token;
-  const refresh =
-    obj.refreshToken || obj.refresh_token || obj?.data?.refreshToken || obj?.data?.refresh_token;
-  return { access, refresh };
-}
-
-async function tryRefreshOnceCorsSafe({ refreshToken }) {
-  if (!refreshToken) throw new Error("Refresh token yo‘q");
-  let lastErr;
-  for (const url of REFRESH_ENDPOINTS) {
-    for (const attempt of buildRefreshAttempts(refreshToken)) {
-      try {
-        const res = await fetch(url, { method: "POST", headers: attempt.headers, body: attempt.body });
-        if (!res.ok) {
-          if (res.status === 404) {
-            lastErr = new Error(`404 at ${url}`);
-            continue;
-          }
-          let msg = `Refresh failed (${res.status})`;
-          try {
-            const j = await res.json();
-            msg = j?.message || msg;
-          } catch {}
-          lastErr = new Error(msg);
-          continue;
-        }
-        const data = await res.json().catch(() => ({}));
-        const { access, refresh } = extractTokens(data);
-        if (!access && !refresh) {
-          lastErr = new Error("Refresh javobida token topilmadi");
-          continue;
-        }
-        return { accessToken: access || null, refreshToken: refresh || null };
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-  }
-  throw lastErr || new Error("Refresh muvaffaqiyatsiz");
-}
-
-/* -------------------- authFetch -------------------- */
-async function authFetch(
-  input,
-  options = {},
-  { retryOn401 = true, accessToken, refreshToken, onRefreshOk, onRefreshFail } = {}
-) {
-  const headers = new Headers(options.headers || {});
-  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-  let res = await fetch(input, { ...options, headers });
-  if (res.status !== 401 || !retryOn401) return res;
-
-  try {
-    const refreshed = await tryRefreshOnceCorsSafe({ refreshToken });
-    onRefreshOk?.(refreshed);
-  } catch {
-    onRefreshFail?.();
-    throw new Error("Sessiya tugadi, iltimos qayta kiring");
-  }
-
-  const headers2 = new Headers(options.headers || {});
-  const latestAccess = localStorage.getItem("accessToken");
-  if (latestAccess) headers2.set("Authorization", `Bearer ${latestAccess}`);
-  res = await fetch(input, { ...options, headers: headers2 });
-  return res;
-}
-
-/* -------------------- Session info -------------------- */
-const buildSessionInfo = (access) => {
-  const role = (localStorage.getItem("role") || "mentor").toLowerCase();
-  const teacherId =
-    localStorage.getItem("teacher_id") ||
-    localStorage.getItem("teacherId") ||
-    localStorage.getItem("mentor_teacher_id") ||
-    null;
-
-  let email =
-    localStorage.getItem("email") ||
-    localStorage.getItem("userEmail") ||
-    localStorage.getItem("mentor_email") ||
-    null;
-
-
-  if (!email && access && access.split(".").length === 3) {
-    try {
-      const payload = JSON.parse(atob(access.split(".")[1]));
-      email = payload?.email || payload?.user?.email || email;
-    } catch {}
-  }
-  return { role, teacherId, email: email ? String(email).toLowerCase() : null };
-};
-
-/* -------------------- Component -------------------- */
 const Sozlamalar = () => {
-	const navigate = useNavigate()
 	const dispatch = useDispatch()
+	const accessToken = useSelector(s => s?.auth?.accessToken)
+	const refreshToken = useSelector(s => s?.auth?.refreshToken)
 
-	// Redux persisted auth
-	const reduxUser = useSelector(s => s?.auth?.user) || null
-	const reduxAccess = useSelector(s => s?.auth?.accessToken) || null
-	const reduxRefresh = useSelector(s => s?.auth?.refreshToken) || null
-
-	// URL tokens -> Redux/LS
-	useEffect(() => {
-		const { access, refresh } = getTokensFromUrl()
-		if (access || refresh) {
-			mergeAndDispatchTokens(
-				dispatch,
-				reduxUser,
-				access || reduxAccess,
-				refresh || reduxRefresh
-			)
-		}
-	}, []) // eslint-disable-line
-
-	const accessToken =
-		useSelector(s => s?.auth?.accessToken) ||
-		localStorage.getItem('accessToken')
-	const refreshToken =
-		useSelector(s => s?.auth?.refreshToken) ||
-		localStorage.getItem('refreshToken')
-
-	const session = useMemo(() => buildSessionInfo(accessToken), [accessToken])
-
-	const [tab, setTab] = useState('info')
-	const [currentUser, setCurrentUser] = useState(null)
-	const [allUsers, setAllUsers] = useState([])
+	const [user, setUser] = useState(null)
 	const [loading, setLoading] = useState(true)
-	const [needsAuth, setNeedsAuth] = useState(false)
-	const [error, setError] = useState(null)
+	const [authError, setAuthError] = useState(false)
 
-	const onRefreshOk = useCallback(
-		({ accessToken: newAccess, refreshToken: newRefresh }) => {
-			mergeAndDispatchTokens(
-				dispatch,
-				reduxUser,
-				newAccess ?? accessToken,
-				newRefresh ?? refreshToken
-			)
-		},
-		[dispatch, reduxUser, accessToken, refreshToken]
-	)
+	const refreshAccessToken = useCallback(async () => {
+		if (!refreshToken) {
+			dispatch(logout())
+			return null
+		}
 
-	const onRefreshFail = useCallback(() => {
-		dispatch(logout())
-		localStorage.removeItem('accessToken')
-		localStorage.removeItem('refreshToken')
-		setNeedsAuth(true)
-	}, [dispatch])
+		try {
+			const r = await fetch(`${API}/auth/refresh`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ refreshToken }),
+			})
 
-	const fetchInfoUsers = useCallback(
-		async signal => {
-			const res = await authFetch(
-				INFO_USERS_URL,
-				{ method: 'GET', signal },
-				{
-					retryOn401: true,
-					accessToken,
-					refreshToken,
-					onRefreshOk,
-					onRefreshFail,
-				}
-			)
-			if (!res.ok) {
-				const j = await res.json().catch(() => ({}))
-				throw new Error(
-					j?.message || `Ma'lumotlarni yuklashda xatolik: ${res.status}`
-				)
+			if (!r.ok) {
+				dispatch(logout())
+				throw new Error('Token yangilashda xato')
 			}
-			const data = await res.json().catch(() => ({}))
-			return Array.isArray(data?.infoUsers) ? data.infoUsers : []
+
+			const data = await r.json()
+			if (!data?.accessToken) throw new Error('accessToken topilmadi')
+
+			dispatch(
+				setCredentials({
+					accessToken: data.accessToken,
+					refreshToken: data.refreshToken || refreshToken,
+				})
+			)
+
+			return data.accessToken
+		} catch (e) {
+			dispatch(logout())
+			throw e
+		}
+	}, [refreshToken, dispatch])
+
+	const authFetch = useCallback(
+		async (url, opts = {}) => {
+			const attempt = async token => {
+				const r = await fetch(url, {
+					...opts,
+					headers: {
+						Authorization: `Bearer ${token}`,
+						...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+						...(opts.headers || {}),
+					},
+				})
+
+				if (r.status === 401) throw new Error('401')
+				if (!r.ok) throw new Error(await r.text())
+				return r.json().catch(() => ({}))
+			}
+
+			try {
+				return await attempt(accessToken || (await refreshAccessToken()))
+			} catch (e) {
+				if (String(e.message).includes('401')) {
+					const t = await refreshAccessToken()
+					if (!t) throw e
+					return await attempt(t)
+				}
+				throw e
+			}
 		},
-		[accessToken, refreshToken, onRefreshOk, onRefreshFail]
+		[accessToken, refreshAccessToken]
 	)
 
-	const load = useCallback(
-		async signal => {
+	useEffect(() => {
+		;(async () => {
 			try {
 				setLoading(true)
-				setError(null)
-				setNeedsAuth(false)
+				setAuthError(false)
 
-				const a = accessToken
-				const r = refreshToken
-				if (!a && !r) {
-					setNeedsAuth(true)
+				if (!accessToken && !refreshToken) {
+					setAuthError(true)
 					setLoading(false)
 					return
 				}
 
-				if (!a && r) {
-					try {
-						const refreshed = await tryRefreshOnceCorsSafe({ refreshToken: r })
-						onRefreshOk(refreshed)
-					} catch {
-						onRefreshFail()
-						setLoading(false)
-						return
-					}
-				}
+				const data = await authFetch(`${API}/teachers`)
+				const teachers = data?.teachers || []
 
-				const list = await fetchInfoUsers(signal)
+				const tid = localStorage.getItem('teacher_id')
+				const email = localStorage.getItem('email')
+				const found =
+					teachers.find(t => t.teacher_id === tid || t.email === email) ||
+					teachers[0]
 
-				const me =
-					list.find(
-						u =>
-							(session.teacherId && u?.teacher_id === session.teacherId) ||
-							(session.email &&
-								u?.email &&
-								String(u.email).toLowerCase() === session.email)
-					) ||
-					list[0] ||
-					null
-
-				setCurrentUser(me)
-				if (session.role === 'admin' || session.role === 'superadmin') {
-					setAllUsers(list)
-				} else {
-					setAllUsers([])
-				}
+				setUser(found)
 				setLoading(false)
 			} catch (err) {
-				console.error('Fetch data error:', err.message)
-				setError(err.message || 'Xatolik yuz berdi')
+				console.error('Load error:', err)
+				if (err.message.includes('401') || err.message.includes('Token')) {
+					setAuthError(true)
+				}
 				setLoading(false)
 			}
-		},
-		[
-			accessToken,
-			refreshToken,
-			session.teacherId,
-			session.email,
-			session.role,
-			fetchInfoUsers,
-			onRefreshOk,
-			onRefreshFail,
-		]
-	)
+		})()
+	}, [accessToken, refreshToken, authFetch])
 
-	useEffect(() => {
-		const ctrl = new AbortController()
-		load(ctrl.signal)
-		return () => ctrl.abort()
-	}, [load])
+	const name = user?.fullName || '-'
+	const gender =
+		user?.gender === 'erkak'
+			? 'Erkak'
+			: user?.gender === 'ayol'
+			? 'Ayol'
+			: user?.gender || ''
 
-	const onManualRefresh = useCallback(() => {
-		const ctrl = new AbortController()
-		load(ctrl.signal)
-	}, [load])
-
-	const getFullName = user => {
-		if (!user) return '-'
-		if (user.fullName) return user.fullName
-		if (user.firstname || user.lastname) {
-			return `${user.firstname || ''} ${user.lastname || ''}`.trim() || '-'
-		}
-		return '-'
+	if (authError) {
+		return (
+			<div className='min-h-screen bg-slate-50 flex items-center justify-center p-6'>
+				<Card className='p-8 text-center max-w-md'>
+					<div className='w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4'>
+						<svg
+							className='w-8 h-8 text-yellow-600'
+							fill='none'
+							viewBox='0 0 24 24'
+							stroke='currentColor'
+						>
+							<path
+								strokeLinecap='round'
+								strokeLinejoin='round'
+								strokeWidth={2}
+								d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+							/>
+						</svg>
+					</div>
+					<h3 className='text-lg font-semibold text-slate-900 mb-2'>
+						Kirish talab qilinadi
+					</h3>
+					<p className='text-slate-600 text-sm mb-6'>
+						Tizimga kirishingiz kerak
+					</p>
+					<button
+						onClick={() => (window.location.href = '/login')}
+						className='px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition'
+					>
+						Tizimga kirish
+					</button>
+				</Card>
+			</div>
+		)
 	}
 
-	const tabs = useMemo(
-		() => [
-			{ key: 'info', label: "Ma'lumotlar" },
-			...(session.role === 'admin' || session.role === 'superadmin'
-				? [{ key: 'team', label: 'Barcha Mentorlar' }]
-				: []),
-		],
-		[session.role]
-	)
-
-	const renderGender = g => {
-		if (!g) return '-'
-		const v = String(g).toLowerCase()
-		if (v === 'erkak' || v === 'male' || v === 'm') return 'Erkak'
-		if (v === 'ayol' || v === 'female' || v === 'f') return 'Ayol'
-		return g
+	if (loading) {
+		return (
+			<div className='min-h-screen bg-slate-50'>
+				<div className='max-w-5xl mx-auto p-6'>
+					<Skeleton className='h-8 w-48 mb-2' />
+					<Skeleton className='h-4 w-32 mb-8' />
+					<Card className='p-8'>
+						<div className='flex items-start gap-6 mb-8'>
+							<Skeleton className='w-20 h-20 rounded-full' />
+							<div className='flex-1'>
+								<Skeleton className='h-6 w-48 mb-2' />
+								<Skeleton className='h-4 w-32' />
+							</div>
+						</div>
+						<div className='grid grid-cols-2 gap-6'>
+							{Array(6)
+								.fill(0)
+								.map((_, i) => (
+									<Skeleton key={i} className='h-12' />
+								))}
+						</div>
+					</Card>
+				</div>
+			</div>
+		)
 	}
+
+	if (!user) return null
 
 	return (
-		<div className='min-h-screen bg-gradient-to-b from-white to-slate-50'>
-			{/* Top brand bar */}
-			<div
-				className='h-1 w-full'
-				style={{ backgroundImage: `linear-gradient(90deg, ${BRAND}, #5ca6f7)` }}
-			/>
-
-			<div className='max-w-7xl mx-auto p-6'>
-				{/* Header */}
-				<div className='flex items-center justify-between mb-6'>
-					<div className='flex items-center gap-3'>
-						<div className='w-9 h-9 rounded-xl bg-gradient-to-br from-[#1777C9] to-[#6ea8ff] grid place-items-center text-white font-bold shadow-[0_10px_24px_-10px_rgba(23,119,201,.9)]'>
-							S
-						</div>
-						<div>
-							<h1 className='text-2xl font-bold text-slate-900'>Sozlamalar</h1>
-							<p className='text-slate-500 text-sm'>
-								Mentor profili va jamoa ma’lumotlari
-							</p>
+		<div className='min-h-screen'>
+			<div className='max-w-5xl mx-auto p-6'>
+				<div className='mb-8'>
+					<div className='flex items-center justify-between mb-2'>
+						<h1 className='text-2xl font-bold text-slate-900'>
+							Welcome, {name.split(' ')[0]}
+						</h1>
+						<div className='flex items-center gap-2'>
+							<button className='p-2 hover:bg-slate-100 rounded-lg transition'>
+								<svg
+									className='w-5 h-5 text-slate-600'
+									fill='none'
+									viewBox='0 0 24 24'
+									stroke='currentColor'
+								>
+									<path
+										strokeLinecap='round'
+										strokeLinejoin='round'
+										strokeWidth={2}
+										d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
+									/>
+								</svg>
+							</button>
+							<div className='w-10 h-10 rounded-full overflow-hidden border-2 border-slate-200'>
+								<img
+									src={user.imgURL || 'https://via.placeholder.com/40'}
+									alt='User'
+									className='w-full h-full object-cover'
+								/>
+							</div>
 						</div>
 					</div>
-
-					<div className='flex items-center gap-2'>
-						<IconBtn title='Yangilash' onClick={onManualRefresh}>
-							<svg className='w-5 h-5' viewBox='0 0 20 20' fill='currentColor'>
-								<path
-									fillRule='evenodd'
-									d='M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z'
-									clipRule='evenodd'
-								/>
-							</svg>
-						</IconBtn>
-						<IconBtn title='Sozlamalar'>
-							<svg className='w-5 h-5' viewBox='0 0 20 20' fill='currentColor'>
-								<path
-									fillRule='evenodd'
-									d='M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z'
-									clipRule='evenodd'
-								/>
-							</svg>
-						</IconBtn>
-					</div>
+					<p className='text-sm text-slate-500'>
+						{new Date().toLocaleDateString('en-US', {
+							weekday: 'short',
+							day: '2-digit',
+							month: 'short',
+							year: 'numeric',
+						})}
+					</p>
 				</div>
 
-				{/* Tabs */}
-				<div className='mb-6'>
-					<PillTabs items={tabs} active={tab} onChange={setTab} />
-				</div>
-
-				{/* States */}
-				{needsAuth ? (
-					<Card className='p-8 text-center'>
-						<p className='text-slate-900 font-semibold mb-2'>
-							Kirish talab qilinadi
-						</p>
-						<p className='text-slate-500 text-sm mb-6'>
-							Davom etish uchun tizimga kiring. Agar sizda havola orqali
-							tokenlar kelishi kerak bo‘lsa, URL’ga{' '}
-							<code className='px-1 py-0.5 bg-slate-100 rounded'>
-								?accessToken=...&amp;refreshToken=...
-							</code>{' '}
-							qo‘shib yuboring.
-						</p>
-						<div className='flex items-center gap-3 justify-center'>
-							<PrimaryBtn onClick={() => navigate('/login')}>
-								Login sahifasiga o‘tish
-							</PrimaryBtn>
-							<GhostBtn onClick={onManualRefresh}>Qayta tekshirish</GhostBtn>
+				<Card className='p-8'>
+					<div className='flex items-start gap-6 mb-8 pb-8 border-b border-slate-100'>
+						<Avatar src={user.imgURL} alt={name} size={80} />
+						<div className='flex-1'>
+							<h2 className='text-xl font-semibold text-slate-900 mb-1'>
+								{name}
+							</h2>
+							<p className='text-sm text-slate-600'>{user.email || '-'}</p>
 						</div>
-					</Card>
-				) : loading ? (
-					<div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-						<Card className='p-6'>
-							<div className='flex flex-col items-center'>
-								<Skeleton className='w-20 h-20 rounded-full mb-4' />
-								<Skeleton className='w-40 h-4 mb-2' />
-								<Skeleton className='w-24 h-3 mb-6' />
-								<div className='w-full space-y-3'>
-									{Array.from({ length: 6 }).map((_, i) => (
-										<Skeleton key={i} className='w-full h-3' />
-									))}
-								</div>
-							</div>
-						</Card>
-						<Card className='p-6 md:col-span-2'>
-							<Skeleton className='w-48 h-4 mb-6' />
-							<div className='grid grid-cols-2 gap-6'>
-								{Array.from({ length: 10 }).map((_, i) => (
-									<Skeleton key={i} className='w-full h-6' />
-								))}
-							</div>
-						</Card>
 					</div>
-				) : error ? (
-					<Card className='p-6 border-red-200 bg-red-50/70'>
-						<div className='text-center'>
-							<p className='text-red-600 mb-4'>Xatolik: {error}</p>
-							<PrimaryBtn
-								onClick={onManualRefresh}
-								className='bg-red-500 hover:bg-red-600 shadow-none'
-							>
-								Qayta urinish
-							</PrimaryBtn>
+
+					<div className='grid grid-cols-1 md:grid-cols-2 gap-6 mb-8'>
+						<Input label='Full Name' value={name} />
+						<Input label='Teacher ID' value={user.teacher_id} />
+						<Select label='Gender' value={gender} />
+						<Input label='Phone' value={user.phone} />
+						<Input label='Location' value={user.location} />
+						<Input label='Company' value={user.company} />
+					</div>
+
+					<div>
+						<h3 className='text-sm font-semibold text-slate-900 mb-4'>
+							My email Address
+						</h3>
+						<div className='flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100'>
+							<div className='w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0'>
+								<svg
+									className='w-5 h-5 text-blue-600'
+									fill='none'
+									viewBox='0 0 24 24'
+									stroke='currentColor'
+								>
+									<path
+										strokeLinecap='round'
+										strokeLinejoin='round'
+										strokeWidth={2}
+										d='M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'
+									/>
+								</svg>
+							</div>
+							<div className='flex-1 min-w-0'>
+								<div className='text-sm font-medium text-slate-900 truncate'>
+									{user.email || '-'}
+								</div>
+								<div className='text-xs text-slate-500 mt-0.5'>Active</div>
+							</div>
+						</div>
+					</div>
+				</Card>
+
+				<div className='mt-6 grid grid-cols-1 md:grid-cols-3 gap-4'>
+					<Card className='p-4'>
+						<div className='text-xs text-slate-500 mb-1'>Position</div>
+						<div className='text-sm font-medium text-slate-900'>
+							{user.position || '-'}
 						</div>
 					</Card>
-				) : !currentUser ? (
-					<Card className='p-6 border-yellow-200 bg-yellow-50/70'>
-						<p className='text-yellow-700 text-center'>Ma'lumot topilmadi</p>
+					<Card className='p-4'>
+						<div className='text-xs text-slate-500 mb-1'>Skype</div>
+						<div className='text-sm font-medium text-slate-900'>
+							{user.skype_username || '-'}
+						</div>
 					</Card>
-				) : (
-					<>
-						{/* Info */}
-						{tab === 'info' && (
-							<div className='flex flex-col lg:flex-row gap-6'>
-								{/* Left */}
-								<div className='lg:w-80 shrink-0'>
-									<Card className='p-6'>
-										<div className='text-center mb-6'>
-											<div className='relative inline-block'>
-												<Avatar
-													src={currentUser.imgURL}
-													alt={getFullName(currentUser)}
-													size={88}
-												/>
-												{/* online dot */}
-												<span className='absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white grid place-items-center'>
-													<span className='w-3.5 h-3.5 rounded-full bg-[#22c55e]' />
-												</span>
-											</div>
-											<h3 className='font-semibold text-slate-900 text-lg mt-3'>
-												{getFullName(currentUser)}
-											</h3>
-											<p className='text-slate-500 text-sm'>
-												{safe(currentUser.position)}
-											</p>
-											<p className='text-slate-400 text-xs mt-1'>
-												{safe(currentUser.teacher_id)}
-											</p>
-										</div>
-
-										<div className='mb-6'>
-											<h4 className='font-semibold text-slate-900 mb-3 text-sm'>
-												Asosiy ma'lumotlar
-											</h4>
-											<div className='space-y-3'>
-												<KV label='Lavozim' value={currentUser.position} />
-												<KV label='Kompaniya' value={currentUser.company} />
-												<KV label='Joylashuv' value={currentUser.location} />
-												<KV
-													label="Tug'ilgan sana"
-													value={humanDate(currentUser.date_of_birth)}
-												/>
-												<KV
-													label='Jinsi'
-													value={renderGender(currentUser.gender)}
-												/>
-											</div>
-										</div>
-
-										<div className='mb-6'>
-											<h4 className='font-semibold text-slate-900 mb-3 text-sm'>
-												Kontakt ma'lumotlari
-											</h4>
-											<div className='space-y-3'>
-												<KV label='Email' value={currentUser.email} />
-												<KV label='Telefon' value={currentUser.phone} />
-												<KV label='Skype' value={currentUser.skype_username} />
-											</div>
-										</div>
-
-										<div>
-											<h4 className='font-semibold text-slate-900 mb-3 text-sm'>
-												Tizim ma'lumotlari
-											</h4>
-											<div className='space-y-3'>
-												<KV label='ID' value={currentUser._id} />
-												<KV label='Teacher ID' value={currentUser.teacher_id} />
-												<KV
-													label="Qo'shilgan sana"
-													value={humanDate(currentUser.createdAt)}
-												/>
-												<KV
-													label='Yangilangan sana'
-													value={humanDate(currentUser.updatedAt)}
-												/>
-											</div>
-										</div>
-									</Card>
-								</div>
-
-								{/* Right */}
-								<div className='flex-1'>
-									<Card className='p-6'>
-										<div className='flex items-center justify-between mb-4'>
-											<h3 className='font-semibold text-slate-900 text-lg'>
-												To'liq ma'lumotlar
-											</h3>
-											<a
-												className='text-sm text-[#1777C9] hover:underline'
-												href={currentUser.imgURL || '#'}
-												target='_blank'
-												rel='noreferrer'
-											>
-												Profil rasmini ko‘rish
-											</a>
-										</div>
-
-										<div className='grid grid-cols-1 sm:grid-cols-2 gap-6'>
-											<InfoItem
-												label="To'liq ismi"
-												value={getFullName(currentUser)}
-											/>
-											<InfoItem
-												label='Lavozim'
-												value={safe(currentUser.position)}
-											/>
-											<InfoItem
-												label='Kompaniya'
-												value={safe(currentUser.company)}
-											/>
-											<InfoItem
-												label='Joylashuv'
-												value={safe(currentUser.location)}
-											/>
-											<InfoItem label='Email' value={safe(currentUser.email)} />
-											<InfoItem
-												label='Telefon'
-												value={safe(currentUser.phone)}
-											/>
-											<InfoItem
-												label='Skype'
-												value={safe(currentUser.skype_username)}
-											/>
-											<InfoItem
-												label='Jinsi'
-												value={renderGender(currentUser.gender)}
-											/>
-											<InfoItem
-												label="Tug'ilgan sana"
-												value={humanDate(currentUser.date_of_birth)}
-											/>
-											<InfoItem
-												label='Teacher ID'
-												value={safe(currentUser.teacher_id)}
-											/>
-											<div className='sm:col-span-2'>
-												<InfoItem
-													label='Database ID'
-													value={safe(currentUser._id)}
-													mono
-												/>
-											</div>
-											<InfoItem
-												label="Qo'shilgan sana"
-												value={humanDate(currentUser.createdAt)}
-											/>
-											<InfoItem
-												label='Yangilangan sana'
-												value={humanDate(currentUser.updatedAt)}
-											/>
-										</div>
-									</Card>
-								</div>
-							</div>
-						)}
-
-						{/* Team */}
-						{tab === 'team' &&
-							(session.role === 'admin' || session.role === 'superadmin') && (
-								<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'>
-									{allUsers.map(user => (
-										<Card
-											key={user._id}
-											className='p-6 hover:shadow-[0_16px_40px_-20px_rgba(23,119,201,.45)] hover:border-[#1777C9]/30 transition'
-										>
-											<div className='text-center'>
-												<Avatar
-													src={user.imgURL}
-													alt={getFullName(user)}
-													size={64}
-												/>
-												<h3 className='font-semibold text-slate-900 mt-4'>
-													{getFullName(user)}
-												</h3>
-												<p className='text-sm text-slate-500 mb-1'>
-													{safe(user.position)}
-												</p>
-												<p className='text-xs text-slate-400'>
-													{safe(user.teacher_id)}
-												</p>
-
-												<div className='space-y-2 text-left mt-4 pt-4 border-t border-slate-100'>
-													<Row label='Kompaniya' value={safe(user.company)} />
-													<Row label='Joylashuv' value={safe(user.location)} />
-													<Row
-														label='Email'
-														value={safe(user.email)}
-														truncate
-													/>
-													<Row label='Telefon' value={safe(user.phone)} />
-												</div>
-											</div>
-										</Card>
-									))}
-								</div>
-							)}
-					</>
-				)}
+					<Card className='p-4'>
+						<div className='text-xs text-slate-500 mb-1'>Phone</div>
+						<div className='text-sm font-medium text-slate-900'>
+							{user.phone || '-'}
+						</div>
+					</Card>
+				</div>
 			</div>
 		</div>
 	)
 }
 
-/* --------- small presentational atoms --------- */
-const InfoItem = ({ label, value, mono = false }) => (
-	<div>
-		<div className='text-sm text-slate-500 mb-1'>{label}</div>
-		<div
-			className={
-				'text-slate-900 font-medium ' +
-				(mono ? 'text-xs font-mono break-all' : '')
-			}
-		>
-			{value}
-		</div>
-	</div>
-)
-
-const Row = ({ label, value, truncate }) => (
-	<div className='flex items-center justify-between gap-2 text-xs'>
-		<span className='text-slate-500'>{label}:</span>
-		<span
-			className={
-				'text-slate-900 font-medium ' +
-				(truncate ? 'truncate max-w-[160px]' : '')
-			}
-		>
-			{value}
-		</span>
-	</div>
-)
-
 export default Sozlamalar
- 
