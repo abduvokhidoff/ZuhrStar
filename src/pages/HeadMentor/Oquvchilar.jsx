@@ -1269,4 +1269,4 @@ const Oquvchilar = () => {
 	)
 }
 
-export default Oquvchilar
+export default Oquvchilar        

@@ -74,7 +74,7 @@ const Aside = () => {
 				label: 'Bildirishnomalar',
 				path: '/admin/bildirishnomalar',
 			},
-			{ icon: FolderOpen, label: 'Sozlamalar', path: '/admin/sozlamalar' },
+			// { icon: FolderOpen, label: 'Sozlamalar', path: '/admin/sozlamalar' },
 		],
 		superadmin: [
 			{ icon: LayoutGrid, label: 'Dashboard', path: '/super-admin/' },
