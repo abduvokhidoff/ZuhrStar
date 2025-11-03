@@ -25,7 +25,7 @@ const F0 = {
   name: "",
   course: "",
   teacher_fullName: "",
-  branch: "Asosiy filial",
+  branch: "",
   start_time: "",
   end_time: "",
   status: "active",
@@ -41,6 +41,11 @@ export default function Guruhlar() {
   const [groups, setGroups] = useState([]);
   const [students, setStudents] = useState([]);
 
+  // lists for selects
+  const [courses, setCourses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [branches, setBranches] = useState([]);
+
   // UI/STATE
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,6 +59,11 @@ export default function Guruhlar() {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(F0);
   const [selectedGroupName, setSelectedGroupName] = useState(null);
+
+  // dropdown UI for course/teacher/branch
+  const [showCoursesDropdown, setShowCoursesDropdown] = useState(false);
+  const [showTeachersDropdown, setShowTeachersDropdown] = useState(false);
+  const [showBranchesDropdown, setShowBranchesDropdown] = useState(false);
 
   // ---------- AUTH HELPERS ----------
   const refreshAccessToken = async () => {
@@ -135,10 +145,41 @@ export default function Guruhlar() {
     }
   };
 
+  // fetch courses, teachers and branches for selects
+  const loadLists = async () => {
+    if (!accessToken) return;
+    try {
+      const [c, t, b] = await Promise.all([
+        fetchWithAuth(`${API_BASE}/api/courses`),
+        fetchWithAuth(`${API_BASE}/api/teachers`),
+        fetchWithAuth(`${API_BASE}/api/branches`),
+      ]);
+      setCourses(Array.isArray(c) ? c : c?.courses || []);
+      setTeachers(Array.isArray(t) ? t : t?.teachers || []);
+      setBranches(Array.isArray(b) ? b : b?.branches || []);
+    } catch (e) {
+      console.error("Load lists error:", e);
+    }
+  };
+
   useEffect(() => {
     loadAll();
+    loadLists();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.dropdown-container')) {
+        setShowCoursesDropdown(false);
+        setShowTeachersDropdown(false);
+        setShowBranchesDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ---------- STATS ----------
   const totalGroups = groups.length;
@@ -156,6 +197,25 @@ export default function Guruhlar() {
     });
   }, [groups, searchTerm]);
 
+  // ---------- select filtering helpers ----------
+  const filteredCourses = useMemo(() => {
+    const q = (form.course || "").trim().toLowerCase();
+    if (!q) return courses;
+    return courses.filter((c) => (c.name || "").toLowerCase().includes(q));
+  }, [form.course, courses]);
+
+  const filteredTeachers = useMemo(() => {
+    const q = (form.teacher_fullName || "").trim().toLowerCase();
+    if (!q) return teachers;
+    return teachers.filter((t) => (t.fullName || "").toLowerCase().includes(q));
+  }, [form.teacher_fullName, teachers]);
+
+  const filteredBranches = useMemo(() => {
+    const q = (form.branch || "").trim().toLowerCase();
+    if (!q) return branches;
+    return branches.filter((b) => (b.title || "").toLowerCase().includes(q));
+  }, [form.branch, branches]);
+
   // ---------- FORM ----------
   const openCreate = () => {
     setForm(F0);
@@ -166,6 +226,7 @@ export default function Guruhlar() {
 
   const openEdit = (g) => {
     setForm({
+      ...F0,
       name: g.name || "",
       course: g.course || "",
       teacher_fullName: g.teacher_fullName || "",
@@ -174,6 +235,7 @@ export default function Guruhlar() {
       end_time: g.end_time || "",
       status: g.status || "active",
       days: g.days || { odd_days: false, even_days: true, every_days: false },
+      _id: g._id || g.group_id || undefined,
     });
     setSelectedGroupName(g.name);
     setIsEditing(true);
@@ -188,9 +250,65 @@ export default function Guruhlar() {
         ...p,
         days: { ...p.days, [k]: type === "checkbox" ? checked : !!value },
       }));
-    } else {
-      setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+      return;
     }
+
+    if (name === "start_time") {
+      const newStart = value;
+      setForm((p) => {
+        const duration = getSelectedCourseDuration(p.course);
+        const end = duration ? calculateEndDateFromString(newStart, duration) : p.end_time;
+        return { ...p, start_time: newStart, end_time: end };
+      });
+      return;
+    }
+
+    setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const getSelectedCourseDuration = (courseName) => {
+    if (!courseName) return 0;
+    const found = courses.find((c) => (c.name || "") === courseName || (c.name || "").toLowerCase() === courseName.toLowerCase());
+    return found ? found.duration || 0 : 0;
+  };
+
+  const calculateEndDateFromString = (startStr, months) => {
+    if (!startStr) return "";
+    const start = new Date(startStr);
+    if (Number.isNaN(start.getTime())) return "";
+    start.setMonth(start.getMonth() + Number(months || 0));
+    return start.toISOString().slice(0, 10);
+  };
+
+  // when user clicks a course in dropdown
+  const selectCourse = (course) => {
+    const groupNumber = 1000 + groups.length + 1;
+    const namePrefix = (course.name?.[0] || "G").toUpperCase();
+    const generatedName = `${namePrefix}-${groupNumber}`;
+
+    const end = form.start_time
+      ? calculateEndDateFromString(form.start_time, course.duration)
+      : "";
+
+    setForm((p) => ({
+      ...p,
+      course: course.name,
+      name: generatedName,
+      end_time: end,
+    }));
+    setShowCoursesDropdown(false);
+  };
+
+  // when user clicks a teacher in dropdown
+  const selectTeacher = (teacher) => {
+    setForm((p) => ({ ...p, teacher_fullName: teacher.fullName }));
+    setShowTeachersDropdown(false);
+  };
+
+  // when user clicks a branch in dropdown
+  const selectBranch = (branch) => {
+    setForm((p) => ({ ...p, branch: branch.title }));
+    setShowBranchesDropdown(false);
   };
 
   const saveGroup = async (e) => {
@@ -243,7 +361,7 @@ export default function Guruhlar() {
   };
 
   const deleteGroup = async (name) => {
-    if (!window.confirm("Guruhni o‘chirishni tasdiqlaysizmi?")) return;
+    if (!window.confirm("Guruhni o'chirishni tasdiqlaysizmi?")) return;
     try {
       await fetchWithAuth(`${API_BASE}/api/groups/${encodeURIComponent(name)}`, {
         method: "DELETE",
@@ -251,7 +369,7 @@ export default function Guruhlar() {
       setGroups((prev) => prev.filter((g) => g.name !== name));
     } catch (e) {
       console.error(e);
-      setError("Guruhni o‘chirishda xatolik yuz berdi.");
+      setError("Guruhni o'chirishda xatolik yuz berdi.");
     }
   };
 
@@ -285,50 +403,142 @@ export default function Guruhlar() {
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* GROUP NAME (read-only auto) */}
                 <input
                   name="name"
-                  placeholder="Guruh nomi *"
+                  placeholder="Guruh nomi (avtomatik)"
                   value={form.name}
-                  onChange={onFormChange}
-                  required
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  readOnly
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
                 />
-                <input
-                  name="course"
-                  placeholder="Kurs nomi (masalan, Front-end) *"
-                  value={form.course}
-                  onChange={onFormChange}
-                  required
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  name="teacher_fullName"
-                  placeholder="Mentor F.I.Sh"
-                  value={form.teacher_fullName}
-                  onChange={onFormChange}
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  name="branch"
-                  placeholder="Filial"
-                  value={form.branch}
-                  onChange={onFormChange}
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+
+                {/* KURS - input with dropdown */}
+                <div className="relative dropdown-container">
+                  <input
+                    name="course"
+                    placeholder="Kurs nomi qidirish..."
+                    value={form.course}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((p) => ({ ...p, course: val }));
+                      setShowCoursesDropdown(true);
+                    }}
+                    onFocus={() => setShowCoursesDropdown(true)}
+                    className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                  {showCoursesDropdown && (
+                    <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-44 overflow-y-auto z-10 shadow">
+                      {filteredCourses.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500">Topilmadi</div>
+                      ) : (
+                        filteredCourses.map((c) => (
+                          <div
+                            key={c.course_id || c._id || c.name}
+                            onClick={() => selectCourse(c)}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                          >
+                            <div className="font-medium">{c.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {c.duration} {c.duration_type || "oy"}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* MENTOR - input with dropdown */}
+                <div className="relative dropdown-container">
+                  <input
+                    name="teacher_fullName"
+                    placeholder="Mentor F.I.Sh qidirish..."
+                    value={form.teacher_fullName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((p) => ({ ...p, teacher_fullName: val }));
+                      setShowTeachersDropdown(true);
+                    }}
+                    onFocus={() => setShowTeachersDropdown(true)}
+                    className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {showTeachersDropdown && (
+                    <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-44 overflow-y-auto z-10 shadow">
+                      {filteredTeachers.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500">Topilmadi</div>
+                      ) : (
+                        filteredTeachers.map((t) => (
+                          <div
+                            key={t._id || t.email || t.fullName}
+                            onClick={() => selectTeacher(t)}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                          >
+                            <div className="font-medium">{t.fullName}</div>
+                            <div className="text-xs text-gray-500">{t.phone || t.email}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* BRANCH - input with dropdown */}
+                <div className="relative dropdown-container">
+                  <input
+                    name="branch"
+                    placeholder="Filial qidirish..."
+                    value={form.branch}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((p) => ({ ...p, branch: val }));
+                      setShowBranchesDropdown(true);
+                    }}
+                    onFocus={() => setShowBranchesDropdown(true)}
+                    className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {showBranchesDropdown && (
+                    <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-44 overflow-y-auto z-10 shadow">
+                      {filteredBranches.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500">Topilmadi</div>
+                      ) : (
+                        filteredBranches.map((b) => (
+                          <div
+                            key={b._id || b.title}
+                            onClick={() => selectBranch(b)}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                          >
+                            <div className="font-medium">{b.title}</div>
+                            {b.description && (
+                              <div className="text-xs text-gray-500">{b.description}</div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* START DATE */}
                 <input
                   name="start_time"
-                  placeholder="Boshlanish (hh:mm)"
+                  type="date"
+                  placeholder="Boshlanish sanasi"
                   value={form.start_time}
                   onChange={onFormChange}
                   className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+
+                {/* END DATE (AUTO) */}
                 <input
                   name="end_time"
-                  placeholder="Tugash (hh:mm)"
+                  type="date"
+                  placeholder="Tugash sanasi"
                   value={form.end_time}
-                  onChange={onFormChange}
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  readOnly
+                  className="w-full border border-gray-300 p-3 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
                 />
+
                 <select
                   name="status"
                   value={form.status}
@@ -545,7 +755,7 @@ export default function Guruhlar() {
 
         {/* Таблица */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Заголовок таблицы (убрал колонку со стрелкой) */}
+          {/* Заголовок таблицы */}
           <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
             <div className="grid grid-cols-11 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
               <div>#</div>
@@ -558,7 +768,7 @@ export default function Guruhlar() {
             </div>
           </div>
 
-          {/* Тело (вся строка кликабельна) */}
+          {/* Тело таблицы */}
           <div className="divide-y divide-gray-100">
             {loading ? (
               <div className="text-center py-8">
@@ -594,7 +804,7 @@ export default function Guruhlar() {
                     key={key}
                     className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => goToGroup(g)}
-                    title="O‘quvchilar sahifasiga o‘tish"
+                    title="O'quvchilar sahifasiga o'tish"
                   >
                     <div className="grid grid-cols-11 gap-4 items-center text-sm">
                       {/* # */}
@@ -625,7 +835,7 @@ export default function Guruhlar() {
                       {/* Time */}
                       <div className="text-gray-600">{timeTxt}</div>
 
-                      {/* Actions (останавливаем клик по строке) */}
+                      {/* Actions */}
                       <div className="flex gap-2 justify-center col-span-2">
                         <button
                           onClick={(e) => {
@@ -643,7 +853,7 @@ export default function Guruhlar() {
                             deleteGroup(g.name);
                           }}
                           className="w-10 h-10 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center transition-colors"
-                          title="O‘chirish"
+                          title="O'chirish"
                         >
                           <Trash2 className="w-10 h-5" />
                         </button>

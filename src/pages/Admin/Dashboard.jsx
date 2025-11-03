@@ -373,6 +373,7 @@ const makeLinePath = (values, w = 700, h = 220, pad = 14) => {
               key={i}
               className={`relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ${k.ring} transition hover:shadow-md`}
             >
+              
               <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${k.grad}`} />
               <div className="relative flex items-center justify-between">
                 <div>
@@ -418,7 +419,7 @@ const makeLinePath = (values, w = 700, h = 220, pad = 14) => {
         {/* Lists */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <ListCard
-            title="Oxirgi 5 ta o‘quvchi"
+            title="Oxirgi o‘quvchilar"
             loading={loading}
             empty="Hali o‘quvchi qo‘shilmagan."
             items={last5Students.map((s) => {
@@ -436,7 +437,7 @@ const makeLinePath = (values, w = 700, h = 220, pad = 14) => {
             })}
           />
           <ListCard
-            title="Oxirgi 5 ta guruh"
+            title="Oxirgi guruhlar"
             loading={loading}
             empty="Hali guruh qo‘shilmagan."
             items={last5Groups.map((g) => {

@@ -238,7 +238,7 @@ export default function Kurslar() {
                 body: JSON.stringify({ status: "muzlagan" }),
               }).then(() => {
                 stu.status = "muzlagan"; // обновим локально
-              }).catch(() => {})
+              }).catch(() => { })
             );
           }
         }
@@ -364,8 +364,8 @@ export default function Kurslar() {
   const avgPrice =
     totalCourses > 0
       ? Math.round(
-          courses.reduce((s, c) => s + (Number(c.price) || 0), 0) / totalCourses
-        )
+        courses.reduce((s, c) => s + (Number(c.price) || 0), 0) / totalCourses
+      )
       : 0;
   const longCourses = courses.filter((c) => Number(c.duration) >= 6).length;
 
@@ -467,8 +467,8 @@ export default function Kurslar() {
       {/* Статистика — карточки */}
       {!selectedCourse && (
         <div className="p-6">
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm">
+          <div className="grid  gap-4 mb-6">
+            <div className="bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm ">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-3xl font-bold text-gray-800 mb-1">
@@ -484,53 +484,6 @@ export default function Kurslar() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-6 border-l-4 border-cyan-500 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-gray-800 mb-1">
-                    {totalGroups}
-                  </div>
-                  <div className="text-sm text-gray-500 uppercase font-medium">
-                    JAMI GURUHLAR
-                  </div>
-                </div>
-                <div className="text-cyan-500">
-                  <Users className="w-8 h-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-6 border-l-4 border-emerald-500 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-gray-800 mb-1">
-                    {avgPrice.toLocaleString()} UZS
-                  </div>
-                  <div className="text-sm text-gray-500 uppercase font-medium">
-                    O'RTACHA NARX
-                  </div>
-                </div>
-                <div className="text-emerald-500">
-                  <Users className="w-8 h-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-6 border-l-4 border-orange-500 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-gray-800 mb-1">
-                    {longCourses}
-                  </div>
-                  <div className="text-sm text-gray-500 uppercase font-medium">
-                    UZOQ KURSLAR
-                  </div>
-                </div>
-                <div className="text-orange-500">
-                  <Users className="w-8 h-8" />
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Панель действий */}
@@ -550,9 +503,8 @@ export default function Kurslar() {
 
               <button
                 onClick={() => setShowFilter((v) => !v)}
-                className={`flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  loading ? "opacity-60 cursor-not-allowed" : ""
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${loading ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
                 disabled={loading}
               >
                 <Filter className="w-4 h-4 text-gray-500" />
@@ -562,9 +514,8 @@ export default function Kurslar() {
               <div className="relative">
                 <button
                   onClick={() => setShowImportExport((v) => !v)}
-                  className={`flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    loading ? "opacity-60 cursor-not-allowed" : ""
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${loading ? "opacity-60 cursor-not-allowed" : ""
+                    }`}
                   disabled={loading}
                 >
                   <Download className="w-4 h-4" />
@@ -669,8 +620,9 @@ export default function Kurslar() {
                   >
                     <div className="grid grid-cols-12 gap-4 items-center text-sm">
                       <div className="text-gray-900">
-                        {filteredCourses.length - index}
+                        {index + 1}
                       </div>
+
 
                       <div className="col-span-3">
                         <span className="font-medium">
@@ -728,16 +680,16 @@ export default function Kurslar() {
         <div className="p-6">
           <div className="bg-white p-6 rounded-xl shadow-md">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-5">
                 <button
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border"
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border font-semibold"
                   onClick={closeCourseDetail}
                 >
                   <ChevronLeft size={18} />
                   Ortga
                 </button>
                 <h2 className="text-2xl font-semibold text-gray-700">
-                  Kurs: <span className="text-gray-900">{selectedCourse.name}</span>
+                  <span className="text-gray-900">{selectedCourse.name}</span>
                 </h2>
               </div>
               {detailLoading ? (
