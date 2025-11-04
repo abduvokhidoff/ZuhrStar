@@ -34,6 +34,7 @@ const Oquvchilar = () => {
   const [showUpdate, setShowUpdate] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showDebtorsOnly, setShowDebtorsOnly] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -128,7 +129,7 @@ const Oquvchilar = () => {
         };
         throw new Error(
           errorMessages[response.status] ||
-            `HTTP error! Status: ${response.status}`
+          `HTTP error! Status: ${response.status}`
         );
       }
       const data = await response.json();
@@ -184,12 +185,19 @@ const Oquvchilar = () => {
     setSelectedStudents(next);
   };
 
-  const filteredStudents = students.filter(
-    (s) =>
+  const filteredStudents = students.filter((s) => {
+    // Qarzdorlar filtri
+    if (showDebtorsOnly) {
+      const isDebtor = s.paid === false || (s.balance && s.balance.toString().includes('-'));
+      if (!isDebtor) return false;
+    }
+    // Qidiruv filtri
+    return (
       s.name?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
       s.surname?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
       s.student_phone?.includes(searchTerm)
-  );
+    );
+  });
 
   const handleDelete = async (studentId) => {
     if (!token) {
@@ -215,8 +223,8 @@ const Oquvchilar = () => {
         };
         throw new Error(
           errorData?.message ||
-            errorMessages[response.status] ||
-            'Serverdan xatolik.'
+          errorMessages[response.status] ||
+          'Serverdan xatolik.'
         );
       }
       setStudents((prev) =>
@@ -603,11 +611,10 @@ const Oquvchilar = () => {
               <h2 className="text-xl font-semibold mb-4">O'quvchi Qo'shish</h2>
               {updateMessage.text && (
                 <div
-                  className={`mb-4 p-3 rounded-lg text-sm ${
-                    updateMessage.type === 'error'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
-                  }`}
+                  className={`mb-4 p-3 rounded-lg text-sm ${updateMessage.type === 'error'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-green-100 text-green-700'
+                    }`}
                 >
                   {updateMessage.text}
                 </div>
@@ -764,11 +771,10 @@ const Oquvchilar = () => {
               </h2>
               {updateMessage.text && (
                 <div
-                  className={`mb-4 p-3 rounded-lg text-sm ${
-                    updateMessage.type === 'error'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
-                  }`}
+                  className={`mb-4 p-3 rounded-lg text-sm ${updateMessage.type === 'error'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-green-100 text-green-700'
+                    }`}
                 >
                   {updateMessage.text}
                 </div>
@@ -973,7 +979,10 @@ const Oquvchilar = () => {
       {/* Stats */}
       <div className="p-6">
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm">
+          <div
+            className="bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setShowDebtorsOnly(false)}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-3xl font-bold text-gray-800 mb-1">
@@ -1018,7 +1027,10 @@ const Oquvchilar = () => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg p-6 border-l-4 border-red-500 shadow-sm">
+          <div
+            className="bg-white rounded-lg p-6 border-l-4 border-red-500 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setShowDebtorsOnly(!showDebtorsOnly)}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-3xl font-bold text-gray-800 mb-1">
@@ -1185,9 +1197,8 @@ const Oquvchilar = () => {
                     </div>
 
                     <div
-                      className={`font-medium text-sm ${
-                        (student.balance || '').includes('-') ? 'text-red-600' : 'text-green-600'
-                      }`}
+                      className={`font-medium text-sm ${(student.balance || '').includes('-') ? 'text-red-600' : 'text-green-600'
+                        }`}
                     >
                       {student.balance || '0 UZS'}
                     </div>
