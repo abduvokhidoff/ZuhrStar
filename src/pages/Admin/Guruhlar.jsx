@@ -9,7 +9,6 @@ import {
   Users,
   Search,
   Download,
-  Upload,
   RefreshCw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -28,8 +27,11 @@ const F0 = {
   branch: "",
   start_time: "",
   end_time: "",
+  start_date: "",
   status: "active",
   days: { odd_days: false, even_days: true, every_days: false },
+  telegramChatId: "",
+  _id: undefined,
 };
 
 export default function Guruhlar() {
@@ -58,7 +60,7 @@ export default function Guruhlar() {
   const [modalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(F0);
-  const [selectedGroupName, setSelectedGroupName] = useState(null);
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
 
   // dropdown UI for course/teacher/branch
   const [showCoursesDropdown, setShowCoursesDropdown] = useState(false);
@@ -96,7 +98,7 @@ export default function Guruhlar() {
         ...options,
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${t}`,
+          ...(t ? { Authorization: `Bearer ${t}` } : {}),
           ...(options.headers || {}),
         },
       });
@@ -114,8 +116,9 @@ export default function Guruhlar() {
         throw new Error(
           `HTTP ${res.status} ${res.statusText}${j?.message ? " — " + j.message : ""}`
         );
-      } catch {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      } catch (parseErr) {
+        // If JSON parse fails, throw original error with text
+        throw new Error(`HTTP ${res.status} ${res.statusText}: ${txt.slice(0, 200)}`);
       }
     }
     try {
@@ -220,7 +223,7 @@ export default function Guruhlar() {
   const openCreate = () => {
     setForm(F0);
     setIsEditing(false);
-    setSelectedGroupName(null);
+    setSelectedGroupId(null);
     setModalOpen(true);
   };
 
@@ -233,11 +236,13 @@ export default function Guruhlar() {
       branch: g.branch || "Asosiy filial",
       start_time: g.start_time || "",
       end_time: g.end_time || "",
+      start_date: g.start_date ? (typeof g.start_date === "string" && g.start_date.includes("T") ? g.start_date.slice(0,10) : g.start_date) : "",
       status: g.status || "active",
       days: g.days || { odd_days: false, even_days: true, every_days: false },
+      telegramChatId: g.telegramChatId || "",
       _id: g._id || g.group_id || undefined,
     });
-    setSelectedGroupName(g.name);
+    setSelectedGroupId(g._id || g.group_id || g.name);
     setIsEditing(true);
     setModalOpen(true);
   };
@@ -253,12 +258,12 @@ export default function Guruhlar() {
       return;
     }
 
-    if (name === "start_time") {
+    if (name === "start_date") {
       const newStart = value;
       setForm((p) => {
         const duration = getSelectedCourseDuration(p.course);
-        const end = duration ? calculateEndDateFromString(newStart, duration) : p.end_time;
-        return { ...p, start_time: newStart, end_time: end };
+        const end = duration ? calculateEndDateFromString(newStart, duration) : "";
+        return { ...p, start_date: newStart };
       });
       return;
     }
@@ -286,15 +291,10 @@ export default function Guruhlar() {
     const namePrefix = (course.name?.[0] || "G").toUpperCase();
     const generatedName = `${namePrefix}-${groupNumber}`;
 
-    const end = form.start_time
-      ? calculateEndDateFromString(form.start_time, course.duration)
-      : "";
-
     setForm((p) => ({
       ...p,
       course: course.name,
       name: generatedName,
-      end_time: end,
     }));
     setShowCoursesDropdown(false);
   };
@@ -311,20 +311,63 @@ export default function Guruhlar() {
     setShowBranchesDropdown(false);
   };
 
+  const ensureISODate = (d) => {
+    if (!d) return "";
+    // if already ISO-like with T, return as-is
+    if (typeof d === "string" && d.includes("T")) return d;
+    try {
+      const iso = new Date(d).toISOString();
+      return iso;
+    } catch {
+      return d;
+    }
+  };
+
+  const makeTelegramChatId = () =>
+    `tg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
   const saveGroup = async (e) => {
     e.preventDefault();
     if (saving) return;
+
+    // Validate required fields
+    if (!form.name || !form.name.trim()) {
+      setError("Guruh nomi bo'sh bo'lmasligi kerak");
+      return;
+    }
+
+    if (!form.course || !form.course.trim()) {
+      setError("Kurs tanlanishi kerak");
+      return;
+    }
+
+    if (!form.start_date || !String(form.start_date).trim()) {
+      setError("Boshlanish sanasi kiritilishi kerak");
+      return;
+    }
+
+    if (!form.start_time || !String(form.start_time).trim()) {
+      setError("Boshlanish vaqti kiritilishi kerak");
+      return;
+    }
+
+    if (!form.end_time || !String(form.end_time).trim()) {
+      setError("Tugash vaqti kiritilishi kerak");
+      return;
+    }
+
     setSaving(true);
     setError("");
 
+    // Build payload matching backend schema
     const payload = {
       name: form.name.trim(),
       course: form.course.trim(),
-      teacher_fullName: form.teacher_fullName.trim(),
-      branch: form.branch.trim(),
+      // backend example uses ISO date strings for start_date/end_date - use ISO
+      start_date: ensureISODate(form.start_date),
       start_time: form.start_time.trim(),
       end_time: form.end_time.trim(),
-      status: form.status,
+      status: form.status || "active",
       days: {
         odd_days: !!form.days?.odd_days,
         even_days: !!form.days?.even_days,
@@ -332,15 +375,51 @@ export default function Guruhlar() {
       },
     };
 
+    // Add optional fields only if they have values
+    if (form.teacher_fullName && form.teacher_fullName.trim()) {
+      payload.teacher_fullName = form.teacher_fullName.trim();
+    }
+
+    if (form.branch && form.branch.trim()) {
+      payload.branch = form.branch.trim();
+    }
+
+    // telegramChatId is required by backend in current API -> ensure present
+    if (form.telegramChatId && String(form.telegramChatId).trim()) {
+      payload.telegramChatId = String(form.telegramChatId).trim();
+    } else if (isEditing && form._id) {
+      // try keep existing id if editing and it was present in form._id (not ideal but better than generating new)
+      payload.telegramChatId = form.telegramChatId || makeTelegramChatId();
+    } else {
+      // generate a temporary telegramChatId to satisfy backend validation
+      payload.telegramChatId = makeTelegramChatId();
+    }
+
+    // Optionally compute end_date from selected course duration (if backend wants end_date)
+    const durationMonths = getSelectedCourseDuration(form.course);
+    if (durationMonths) {
+      try {
+        const start = new Date(form.start_date);
+        if (!Number.isNaN(start.getTime())) {
+          start.setMonth(start.getMonth() + Number(durationMonths || 0));
+          payload.end_date = start.toISOString();
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    console.log("📤 Sending payload:", JSON.stringify(payload, null, 2));
+
     try {
-      if (isEditing && selectedGroupName) {
-        await fetchWithAuth(
-          `${API_BASE}/api/groups/${encodeURIComponent(selectedGroupName)}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(payload),
-          }
-        );
+      if (isEditing && selectedGroupId) {
+        // Use ID if available, otherwise fall back to encoded name (for compat)
+        const idToUse = encodeURIComponent(selectedGroupId);
+        await fetchWithAuth(`${API_BASE}/api/groups/${idToUse}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        console.log("✅ Group updated successfully");
         const fresh = await fetchWithAuth(`${API_BASE}/api/groups`);
         setGroups(Array.isArray(fresh) ? fresh : []);
       } else {
@@ -348,25 +427,57 @@ export default function Guruhlar() {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        const newG = Array.isArray(created) ? created[0] : created?.data ?? created;
-        setGroups((prev) => (newG ? [newG, ...prev] : prev));
+        console.log("✅ Server response:", created);
+
+        // Handle different response formats
+        let newG;
+        if (Array.isArray(created)) {
+          newG = created[0];
+        } else if (created?.data) {
+          newG = created.data;
+        } else if (created?.group) {
+          newG = created.group;
+        } else {
+          newG = created;
+        }
+
+        if (newG) {
+          // Normalize date fields to expected display format (keep style)
+          setGroups((prev) => [newG, ...prev]);
+        } else {
+          // If no group returned, reload all groups
+          await loadAll();
+        }
       }
       setModalOpen(false);
+      setForm(F0);
+      setSelectedGroupId(null);
+      setError("");
     } catch (e2) {
-      console.error(e2);
-      setError("Guruhni saqlashda xatolik yuz berdi.");
+      console.error("❌ Save error:", e2);
+      // If error message contains JSON, show the server message
+      if (e2?.message) {
+        setError(e2.message);
+      } else {
+        setError("Guruhni saqlashda xatolik yuz berdi.");
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteGroup = async (name) => {
+  const deleteGroup = async (idOrName) => {
     if (!window.confirm("Guruhni o'chirishni tasdiqlaysizmi?")) return;
     try {
-      await fetchWithAuth(`${API_BASE}/api/groups/${encodeURIComponent(name)}`, {
+      // Prefer ID if it's an object id, otherwise pass as-is
+      const encoded = encodeURIComponent(idOrName);
+      await fetchWithAuth(`${API_BASE}/api/groups/${encoded}`, {
         method: "DELETE",
       });
-      setGroups((prev) => prev.filter((g) => g.name !== name));
+      setGroups((prev) => prev.filter((g) => {
+        const gid = g._id || g.group_id || g.name;
+        return String(gid) !== String(idOrName);
+      }));
     } catch (e) {
       console.error(e);
       setError("Guruhni o'chirishda xatolik yuz berdi.");
@@ -402,6 +513,12 @@ export default function Guruhlar() {
                 {isEditing ? "Guruhni tahrirlash" : "Yangi guruh yaratish"}
               </h2>
 
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* GROUP NAME (read-only auto) */}
                 <input
@@ -416,7 +533,7 @@ export default function Guruhlar() {
                 <div className="relative dropdown-container">
                   <input
                     name="course"
-                    placeholder="Kurs nomi qidirish..."
+                    placeholder="Kurs nomi qidirish... *"
                     value={form.course}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -425,7 +542,6 @@ export default function Guruhlar() {
                     }}
                     onFocus={() => setShowCoursesDropdown(true)}
                     className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                   {showCoursesDropdown && (
                     <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-44 overflow-y-auto z-10 shadow">
@@ -521,22 +637,32 @@ export default function Guruhlar() {
 
                 {/* START DATE */}
                 <input
-                  name="start_time"
+                  name="start_date"
                   type="date"
-                  placeholder="Boshlanish sanasi"
+                  placeholder="Boshlanish sanasi *"
+                  value={form.start_date}
+                  onChange={onFormChange}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+
+                {/* START TIME */}
+                <input
+                  name="start_time"
+                  type="time"
+                  placeholder="Boshlanish vaqti *"
                   value={form.start_time}
                   onChange={onFormChange}
                   className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
-                {/* END DATE (AUTO) */}
+                {/* END TIME */}
                 <input
                   name="end_time"
-                  type="date"
-                  placeholder="Tugash sanasi"
+                  type="time"
+                  placeholder="Tugash vaqti *"
                   value={form.end_time}
-                  readOnly
-                  className="w-full border border-gray-300 p-3 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                  onChange={onFormChange}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <select
@@ -585,7 +711,10 @@ export default function Guruhlar() {
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => {
+                    setModalOpen(false);
+                    setError("");
+                  }}
                   className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                 >
                   Bekor qilish
@@ -595,11 +724,9 @@ export default function Guruhlar() {
                   disabled={saving}
                   className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-60"
                 >
-                  {isEditing ? "Yangilash" : "Yaratish"}
+                  {saving ? "Saqlanmoqda..." : (isEditing ? "Yangilash" : "Yaratish")}
                 </button>
               </div>
-
-              {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
             </form>
           </div>
         )}
@@ -741,14 +868,14 @@ export default function Guruhlar() {
         </div>
 
         {/* Ошибка */}
-        {error && (
+        {error && !modalOpen && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 mb-6 rounded-lg flex items-center justify-between">
             <span>{error}</span>
             <button
-              onClick={loadAll}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              onClick={() => setError("")}
+              className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
             >
-              Qayta urinish
+              Yopish
             </button>
           </div>
         )}
@@ -757,13 +884,14 @@ export default function Guruhlar() {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {/* Заголовок таблицы */}
           <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-            <div className="grid grid-cols-11 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
               <div>#</div>
-              <div className="col-span-3">Guruh nomi</div>
-              <div>Kurs</div>
-              <div>Mentor</div>
+              <div className="col-span-2">Guruh nomi</div>
+              <div className="col-span-2">Kurs</div>
+              <div className="col-span-2">Mentor</div>
               <div>Kunlar</div>
               <div>Vaqt</div>
+              <div>Sana</div>
               <div className="text-center col-span-2">Amallar</div>
             </div>
           </div>
@@ -795,6 +923,17 @@ export default function Guruhlar() {
                   g.start_time && g.end_time
                     ? `${g.start_time}–${g.end_time}`
                     : g.start_time || g.end_time || "—";
+                // try to display date as YYYY-MM-DD if it's ISO
+                let dateTxt = "—";
+                if (g.start_date) {
+                  try {
+                    const d = new Date(g.start_date);
+                    if (!Number.isNaN(d.getTime())) dateTxt = d.toISOString().slice(0, 10);
+                    else dateTxt = String(g.start_date).slice(0, 10);
+                  } catch {
+                    dateTxt = String(g.start_date).slice(0, 10);
+                  }
+                }
                 const studentCount = Array.isArray(g.students)
                   ? g.students.length
                   : 0;
@@ -802,62 +941,50 @@ export default function Guruhlar() {
                 return (
                   <div
                     key={key}
-                    className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => goToGroup(g)}
-                    title="O'quvchilar sahifasiga o'tish"
                   >
-                    <div className="grid grid-cols-11 gap-4 items-center text-sm">
-                      {/* # */}
-                      <div className="text-gray-900">{idx + 1}</div>
+                    <div className="text-gray-700 text-sm">{idx + 1}</div>
 
-                      {/* Name + badge */}
-                      <div className="col-span-3 inline-flex items-center gap-2">
-                        <span className="font-medium text-gray-900">
-                          {g.name || "—"}
-                        </span>
-                        <span className="inline-flex items-center text-xs bg-gray-100 px-2 py-0.5 rounded-full">
-                          <Users size={14} className="mr-1" />
-                          {studentCount}
-                        </span>
+                    <div className="col-span-2">
+                      <div className="font-semibold text-gray-800">{g.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {studentCount} o'quvchi
                       </div>
+                    </div>
 
-                      {/* Course */}
-                      <div className="text-gray-600">{g.course || "—"}</div>
+                    <div className="text-gray-700 text-sm col-span-2">{g.course || "—"}</div>
+                    <div className="text-gray-700 text-sm col-span-2">
+                      {g.teacher_fullName || "—"}
+                    </div>
+                    <div className="text-gray-700 text-sm">{daysTxt}</div>
+                    <div className="text-gray-700 text-sm">{timeTxt}</div>
+                    <div className="text-gray-700 text-sm">{dateTxt}</div>
 
-                      {/* Mentor */}
-                      <div className="text-gray-600">
-                        {g.teacher_fullName || "—"}
-                      </div>
+                    {/* Amallar */}
+                    <div className="flex justify-center gap-3 col-span-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(g);
+                        }}
+                        className="p-2 bg-blue-50 hover:bg-blue-100 rounded-lg"
+                        title="Tahrirlash"
+                      >
+                        <Pencil className="w-4 h-4 text-blue-600" />
+                      </button>
 
-                      {/* Days */}
-                      <div className="text-gray-600">{daysTxt}</div>
-
-                      {/* Time */}
-                      <div className="text-gray-600">{timeTxt}</div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 justify-center col-span-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEdit(g);
-                          }}
-                          className="w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
-                          title="Tahrirlash"
-                        >
-                          <Pencil className="w-10 h-5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteGroup(g.name);
-                          }}
-                          className="w-10 h-10 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center transition-colors"
-                          title="O'chirish"
-                        >
-                          <Trash2 className="w-10 h-5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const idToDelete = g._id || g.group_id || g.name;
+                          deleteGroup(idToDelete);
+                        }}
+                        className="p-2 bg-red-50 hover:bg-red-100 rounded-lg"
+                        title="O'chirish"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </button>
                     </div>
                   </div>
                 );
