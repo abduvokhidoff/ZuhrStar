@@ -1,6 +1,4 @@
- import React, { useState, useEffect, use } from 'react'
-import { PiStudentBold } from "react-icons/pi";
-import { useSelector } from 'react-redux';
+import React, { useState, useEffect } from 'react'
 
 const Dashboard = () => {
 	const [studentsCount, setStudentsCount] = useState(0)
@@ -9,11 +7,12 @@ const Dashboard = () => {
 	const [studentsData, setStudentsData] = useState([])
 	const [studentsLoading, setStudentsLoading] = useState(true)
 	const [groupsData, setGroupsData] = useState([])
-	const [filteredGroups, setFilteredGroups] = useState([]) // Abduvohid guruhlar uchun
+	const [filteredGroups, setFilteredGroups] = useState([])
 	const [selectedGroup, setSelectedGroup] = useState(null)
 	const [isModalOpen, setIsModalOpen] = useState(false)
 	const [salaries, setSalaries] = useState(0)
-	const AUTH_TOKEN = useSelector(s => s?.auth?.accessToken)
+	const AUTH_TOKEN =
+		'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4YTMyNTdkN2E4ZjEwMDdkMDExY2EyOCIsInJvbGUiOiJNZW50b3IiLCJpYXQiOjE3NjE2NTIzMzIsImV4cCI6MTc2MTY1OTUzMn0.HF6ChyqKfS1BlZOXqVuKHPkcqj_63k2J2P3zybCrg_0'
 	const BASE_URL = 'https://zuhrstar-production.up.railway.app/api'
 	const TEACHER_NAME = 'Abduvohid Xoshimov'
 
@@ -63,9 +62,10 @@ const Dashboard = () => {
 						salariesResponse.json(),
 					])
 
-				console.log("Groups API dan kelgan ma'lumot:", groupsDataResponse)
-				console.log("Students API dan kelgan ma'lumot:", studentsDataResponse)
-				console.log("Salaries API dan kelgan ma'lumot:", salariesData)
+				console.log("=== API MA'LUMOTLARI ===")
+				console.log('Groups:', groupsDataResponse)
+				console.log('Students:', studentsDataResponse)
+				console.log('Salaries:', salariesData)
 
 				setGroupsData(groupsDataResponse)
 
@@ -73,7 +73,7 @@ const Dashboard = () => {
 					group => group.teacher_fullName === TEACHER_NAME
 				)
 
-				console.log('Abduvohid Xoshimov guruhlari:', abduvohidGroups)
+				console.log('Abduvohid guruhlari:', abduvohidGroups)
 
 				setFilteredGroups(abduvohidGroups)
 				const totalGroups = abduvohidGroups.length
@@ -113,6 +113,7 @@ const Dashboard = () => {
 
 	const getAbduvohidStudents = () => {
 		if (!Array.isArray(filteredGroups) || !Array.isArray(studentsData)) {
+			console.log("❌ Ma'lumotlar massiv emas")
 			return []
 		}
 
@@ -123,59 +124,77 @@ const Dashboard = () => {
 			}
 		})
 
+		console.log("=== O'QUVCHI FILTRLASH ===")
+		console.log('Student IDlar:', abduvohidStudentIds)
+		console.log('Barcha students:', studentsData.length)
+
 		const abduvohidStudents = studentsData.filter(student =>
 			abduvohidStudentIds.includes(student._id)
 		)
 
-		console.log("Abduvohid o'quvchilari:", abduvohidStudents)
+		console.log("Topilgan o'quvchilar:", abduvohidStudents.length)
+		console.log("O'quvchilar ma'lumoti:", abduvohidStudents)
 
 		return abduvohidStudents
+	}
+
+	const isExcellentStudent = student => {
+		if (!student) return false
+
+		const note = (student.note || '').toLowerCase().trim()
+
+		const excellentKeywords = [
+			'отличник',
+			'otlichnik',
+			'excellent',
+			"a'lo",
+			'alo',
+			'5',
+			'five',
+		]
+
+		const isExcellent = excellentKeywords.some(keyword =>
+			note.includes(keyword)
+		)
+
+		if (isExcellent) {
+			console.log(`✅ ${student.name}: "${student.note}" - EXCELLENT`)
+		}
+
+		return isExcellent
 	}
 
 	const getStudentsStats = () => {
 		const abduvohidStudents = getAbduvohidStudents()
 
-		console.log("Statistika uchun o'quvchilar:", abduvohidStudents)
+		console.log('=== STATISTIKA HISOBLASH ===')
+		console.log("Jami o'quvchilar:", abduvohidStudents.length)
 
 		if (abduvohidStudents.length === 0) {
+			console.log("❌ O'quvchilar topilmadi")
 			return { excellent: 0, others: 0, total: 0, excellentPercentage: 0 }
 		}
 
-		const excellent = abduvohidStudents.filter(student => {
-			const note = student.note || ''
-			return note.includes('Отличник')
-		}).length
+		abduvohidStudents.forEach(student => {
+			console.log(`Student: ${student.name}, Note: "${student.note}"`)
+		})
 
+		const excellent = abduvohidStudents.filter(isExcellentStudent).length
 		const others = abduvohidStudents.length - excellent
 		const total = abduvohidStudents.length
 		const excellentPercentage = total > 0 ? (excellent / total) * 100 : 0
 
-		console.log('Statistika:', {
+		console.log('📊 NATIJA:', {
 			excellent,
 			others,
 			total,
-			excellentPercentage,
+			excellentPercentage: excellentPercentage.toFixed(1) + '%',
 		})
 
 		return { excellent, others, total, excellentPercentage }
 	}
 
 	const { excellent, others, total, excellentPercentage } = getStudentsStats()
-
-	const getBalanceColor = balanceText => {
-		const cleanNumber = balanceText.toString().replace(/[.,\s]/g, '')
-		const number = parseInt(cleanNumber)
-
-		if (isNaN(number)) return 'text-gray-500'
-
-		if (number >= 10000000) {
-			return 'text-green-500'
-		} else if (number >= 5000000) {
-			return 'text-orange-500'
-		} else {
-			return 'text-red-500'
-		}
-	}
 
 	const getStatusBg = status => {
 		if (status === 'active') {
@@ -206,67 +225,57 @@ const Dashboard = () => {
 	}
 
 	return (
-		<div className='relative min-h-screen p-6'>
+		<div className='relative min-h-screen bg-gray-50 p-6'>
 			<div className='mb-8'>
 				<h1 className='text-4xl font-bold text-gray-800 mb-2'>Dashboard</h1>
 				<p className='text-gray-500'>Salom, Mentor!</p>
 			</div>
 
 			<div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'>
-				<div className='bg-white rounded-lg p-6 shadow-sm'>
-					<div className='flex items-center justify-between'>
+				<div className='relative bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 shadow-lg overflow-hidden'>
+					<div className='absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16'></div>
+					<div className='relative z-10'>
 						<div>
-							<p className='text-gray-500 text-sm mb-1'>O'quvchilar Soni</p>
-							<p className='text-3xl font-bold text-gray-800'>
-								{loading ? 'Yuklanmoqda...' : studentsCount}
+							<p className='text-white/90 text-sm font-medium mb-2'>
+								O'quvchilar Soni
+							</p>
+							<p className='text-white text-4xl font-bold'>
+								{loading ? '...' : studentsCount}
 							</p>
 						</div>
-						<img
-							className='w-12 h-12 rounded-lg'
-							src='https://cdn-icons-png.flaticon.com/512/2799/2799122.png'
-							alt='Students'
-						/>
-						{/* <PiStudentBold /> */}
 					</div>
 				</div>
-				<div className='bg-white rounded-lg p-6 shadow-sm'>
-					<div className='flex items-center justify-between'>
+
+				<div className='relative bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 shadow-lg overflow-hidden'>
+					<div className='absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16'></div>
+					<div className='relative z-10'>
 						<div>
-							<p className='text-gray-500 text-sm mb-1'>Guruhlar soni</p>
-							<p className='text-3xl font-bold text-gray-800'>
-								{loading ? 'Yuklanmoqda...' : groupsCount}
+							<p className='text-white/90 text-sm font-medium mb-2'>
+								Guruhlar Soni
+							</p>
+							<p className='text-white text-4xl font-bold'>
+								{loading ? '...' : groupsCount}
 							</p>
 						</div>
-						<img
-							className='w-12 h-12 rounded-lg'
-							src='https://cdn-icons-png.freepik.com/512/8163/8163740.png'
-							alt='Groups'
-						/>
 					</div>
 				</div>
-				<div className='bg-white rounded-lg p-6 shadow-sm'>
-					<div className='flex items-center justify-between'>
+
+				<div className='relative bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 shadow-lg overflow-hidden'>
+					<div className='absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16'></div>
+					<div className='relative z-10'>
 						<div>
-							<p className='text-gray-500 text-sm mb-1'>Oylik ish haqi</p>
-							<p
-								className={`text-3xl font-bold ${getBalanceColor(
-									salaries.toString()
-								)}`}
-							>
+							<p className='text-white/90 text-sm font-medium mb-2'>
+								Oylik ish haqi
+							</p>
+							<p className='text-white text-4xl font-bold'>
 								{salaries.toLocaleString()} so'm
 							</p>
 						</div>
-						<img
-							className='w-12 h-12 rounded-lg'
-							src='https://cdn-icons-png.flaticon.com/512/1571/1571098.png'
-							alt='Salary'
-						/>
 					</div>
 				</div>
 			</div>
 
 			<div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-				{/* Top Students - Groups kartochka stilida */}
 				<div className='lg:col-span-2 bg-white rounded-lg p-6 shadow-sm'>
 					<h2 className='text-xl font-bold text-gray-800 mb-6'>Top Students</h2>
 					{studentsLoading ? (
@@ -274,10 +283,7 @@ const Dashboard = () => {
 					) : (
 						<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
 							{getAbduvohidStudents()
-								.filter(student => {
-									const note = student.note || ''
-									return note.includes('Отличник')
-								})
+								.filter(isExcellentStudent)
 								.slice(0, 8)
 								.map((student, index) => (
 									<div
@@ -306,19 +312,22 @@ const Dashboard = () => {
 										</span>
 									</div>
 								))}
-							{getAbduvohidStudents().filter(student => {
-								const note = student.note || ''
-								return note.includes('Отличник')
-							}).length === 0 && (
-								<div className='col-span-full text-center py-8 text-gray-500'>
-									Hozircha "Отличник" statusidagi o'quvchilar yo'q
+							{getAbduvohidStudents().filter(isExcellentStudent).length ===
+								0 && (
+								<div className='col-span-full text-center py-8'>
+									<div className='text-gray-400 text-5xl mb-4'>🎓</div>
+									<p className='text-gray-500 font-medium'>
+										Hozircha "Отличник" statusidagi o'quvchilar yo'q
+									</p>
+									<p className='text-gray-400 text-sm mt-2'>
+										Jami {getAbduvohidStudents().length} ta o'quvchi mavjud
+									</p>
 								</div>
 							)}
 						</div>
 					)}
 				</div>
 
-				{/* Students Performance - rang tuzatildi */}
 				<div className='bg-white rounded-lg p-6 shadow-sm'>
 					<h2 className='text-xl font-bold text-gray-800 mb-6'>
 						Students Performance
@@ -331,7 +340,6 @@ const Dashboard = () => {
 						<div className='flex flex-col items-center'>
 							<div className='relative mb-6'>
 								<svg width='180' height='180' className='transform -rotate-90'>
-									{/* Asosiy doira - qizil */}
 									<circle
 										cx='90'
 										cy='90'
@@ -343,7 +351,6 @@ const Dashboard = () => {
 										strokeDashoffset='0'
 										strokeLinecap='round'
 									/>
-									{/* Yashil qism - "Отличник" uchun */}
 									<circle
 										cx='90'
 										cy='90'
@@ -499,14 +506,13 @@ const Dashboard = () => {
 
 			{isModalOpen && selectedGroup && (
 				<div
-					className='fixed inset-0  backdrop-blur-lg flex items-center justify-center z-50'
+					className='fixed inset-0 backdrop-blur-lg flex items-center justify-center z-50'
 					onClick={closeModal}
 				>
 					<div
 						className='bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto'
 						onClick={e => e.stopPropagation()}
 					>
-						{/* Modal Header */}
 						<div className='flex items-center justify-between mb-6 border-b pb-4'>
 							<div className='flex items-center space-x-4'>
 								<div
@@ -529,9 +535,7 @@ const Dashboard = () => {
 							</button>
 						</div>
 
-						{/* Modal Content */}
 						<div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-							{/* O'qituvchi */}
 							<div className='bg-blue-50 rounded-xl p-4'>
 								<div className='flex items-center space-x-3'>
 									<div className='w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center'>
@@ -558,7 +562,6 @@ const Dashboard = () => {
 								</div>
 							</div>
 
-							{/* Filial */}
 							<div className='bg-green-50 rounded-xl p-4'>
 								<div className='flex items-center space-x-3'>
 									<div className='w-12 h-12 bg-green-500 rounded-full flex items-center justify-center'>
@@ -585,7 +588,6 @@ const Dashboard = () => {
 								</div>
 							</div>
 
-							{/* Dars vaqti */}
 							<div className='bg-orange-50 rounded-xl p-4'>
 								<div className='flex items-center space-x-3'>
 									<div className='w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center'>
@@ -613,7 +615,6 @@ const Dashboard = () => {
 								</div>
 							</div>
 
-							{/* Holat */}
 							<div className='bg-purple-50 rounded-xl p-4'>
 								<div className='flex items-center space-x-3'>
 									<div className='w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center'>
@@ -645,7 +646,6 @@ const Dashboard = () => {
 							</div>
 						</div>
 
-						{/* O'quvchilar */}
 						{selectedGroup.students && selectedGroup.students.length > 0 && (
 							<div className='mt-6'>
 								<h3 className='text-lg font-bold text-gray-800 mb-4'>
@@ -654,21 +654,8 @@ const Dashboard = () => {
 								<div className='bg-gray-50 rounded-xl p-4 max-h-40 overflow-y-auto'>
 									<div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
 										{selectedGroup.students.map((student, index) => {
-											// studentsData dan o'quvchi ma'lumotlarini topamiz
 											const studentInfo = studentsData.find(
 												s => s._id === student
-											)
-
-											console.log('Modal - Student ID:', student)
-											console.log('Modal - Student Info:', studentInfo)
-											console.log('Modal - Student name:', studentInfo?.name)
-											console.log(
-												'Modal - Student surname:',
-												studentInfo?.surname
-											)
-											console.log(
-												'Modal - Student phone:',
-												studentInfo?.student_phone
 											)
 
 											return (
@@ -692,14 +679,6 @@ const Dashboard = () => {
 																? studentInfo.student_phone
 																: "Telefon yo'q"}
 														</p>
-														{/* Debug ma'lumotlari - ishlab chiqish uchun */}
-														{studentInfo && (
-															<p className='text-xs text-blue-500 mt-1'>
-																Debug: {studentInfo.name} |{' '}
-																{studentInfo.student_phone} | Note:{' '}
-																{studentInfo.note}
-															</p>
-														)}
 													</div>
 												</div>
 											)
@@ -709,7 +688,6 @@ const Dashboard = () => {
 							</div>
 						)}
 
-						{/* Modal Footer */}
 						<div className='mt-8 flex justify-end space-x-4'>
 							<button
 								onClick={closeModal}
