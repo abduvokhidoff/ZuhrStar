@@ -4,7 +4,7 @@ import { setCredentials } from '../redux/authSlice'
 import axios from 'axios'
 import logowhite from '../assets/logowhite.png'
 import logo from '../assets/logo.png'
-import { ArrowRight, Eye, EyeClosed } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
@@ -53,12 +53,12 @@ const LoginLayout = () => {
 		<div className='w-screen h-screen relative overflow-hidden'>
 			{/* LEFT PANEL (Intro) */}
 			<div
-				className={`absolute inset-0 bg-[#3F8CFF] px-[94px] py-[60px] flex items-center justify-center transition-opacity duration-1000 ${
+				className={`absolute inset-0 bg-[#3F8CFF] px-6 sm:px-12 md:px-[94px] py-8 sm:py-12 md:py-[60px] flex items-center justify-center transition-opacity duration-1000 ${
 					showLoginForm ? 'opacity-0 pointer-events-none' : 'opacity-100'
 				}`}
 			>
 				<img
-					className='w-[500px]'
+					className='w-[200px] sm:w-[300px] md:w-[400px] lg:w-[500px]'
 					data-aos='zoom-in'
 					src={logowhite}
 					alt='logo'
@@ -67,25 +67,29 @@ const LoginLayout = () => {
 
 			{/* RIGHT PANEL (Login Form) */}
 			<div
-				className={`absolute inset-0 px-[139px] flex flex-col justify-center items-center transition-opacity duration-1000 ${
+				className={`absolute inset-0 px-6 sm:px-12 md:px-20 lg:px-[139px] flex flex-col justify-center items-center transition-opacity duration-1000 ${
 					showLoginForm ? 'opacity-100' : 'opacity-0 pointer-events-none'
 				}`}
 			>
-				<div className='flex flex-col gap-[33px] w-[40%] z-[2]'>
-					<div className='flex flex-col items-center justify-center gap-[23px]'>
-						<img className='w-[150px]' src={logo} alt="" />
-						<h2 className='text-center text-[#0A1629] text-[25px] font-[700]'>
+				<div className='flex flex-col gap-6 sm:gap-[33px] w-full sm:w-[80%] md:w-[60%] lg:w-[40%] z-[2]'>
+					<div className='flex flex-col items-center justify-center gap-4 sm:gap-[23px]'>
+						<img
+							className='w-[100px] sm:w-[120px] md:w-[150px]'
+							src={logo}
+							alt=''
+						/>
+						<h2 className='text-center text-[#0A1629] text-[20px] sm:text-[22px] md:text-[25px] font-[700]'>
 							Sign In to ZuhrStar
 						</h2>
 					</div>
 
 					<form
 						onSubmit={e => e.preventDefault()}
-						className='flex flex-col gap-[29px] w-full'
+						className='flex flex-col gap-5 sm:gap-[29px] w-full'
 					>
 						{/* Phone */}
 						<div className='flex flex-col gap-[7px]'>
-							<label className='text-[#7D8592] font-[600] text-[16px]'>
+							<label className='text-[#7D8592] font-[600] text-[14px] sm:text-[16px]'>
 								Phone Number
 							</label>
 							<input
@@ -93,43 +97,48 @@ const LoginLayout = () => {
 								value={phoneNumber}
 								onChange={e => setPhoneNumber(e.target.value)}
 								placeholder='yourphonenumber'
-								className='px-[18px] py-[12px] border-2 border-[#D8E0F0] rounded-[14px] outline-none'
+								className='px-4 sm:px-[18px] py-3 sm:py-[12px] border-2 border-[#D8E0F0] rounded-[14px] outline-none text-[14px] sm:text-[16px]'
 							/>
 						</div>
 
 						{/* Password */}
 						<div className='flex flex-col gap-[7px]'>
-							<label className='text-[#7D8592] font-[600] text-[16px]'>
+							<label className='text-[#7D8592] font-[600] text-[14px] sm:text-[16px]'>
 								Password
 							</label>
-							<div className='px-[18px] py-[12px] border-2 border-[#D8E0F0] rounded-[14px] flex items-center justify-between'>
+							<div className='px-4 sm:px-[18px] py-3 sm:py-[12px] border-2 border-[#D8E0F0] rounded-[14px] flex items-center justify-between'>
 								<input
 									type={showPassword ? 'text' : 'password'}
 									value={password}
 									onChange={e => setPassword(e.target.value)}
 									placeholder='yourpassword'
-									className='w-full outline-none'
+									className='w-full outline-none text-[14px] sm:text-[16px]'
 								/>
 								<button
 									type='button'
 									onClick={() => setShowPassword(prev => !prev)}
 								>
 									{showPassword ? (
-										<EyeClosed size={24} className='text-[#aab0bf]' />
+										<EyeOff
+											size={20}
+											className='text-[#aab0bf] sm:w-6 sm:h-6'
+										/>
 									) : (
-										<Eye size={24} className='text-[#aab0bf]' />
+										<Eye size={20} className='text-[#aab0bf] sm:w-6 sm:h-6' />
 									)}
 								</button>
 							</div>
 						</div>
 
-						{error && <p className='text-red-500'>{error}</p>}
+						{error && (
+							<p className='text-red-500 text-[14px] sm:text-[16px]'>{error}</p>
+						)}
 
 						{/* Submit Button */}
 						<div className='flex justify-center w-full'>
 							<button
 								onClick={handleLogin}
-								className='bg-[#3F8CFF] w-[50%] flex items-center justify-center gap-[7px] h-[48px] rounded-[14px] text-white'
+								className='bg-[#3F8CFF] w-full sm:w-[70%] md:w-[50%] flex items-center justify-center gap-[7px] h-[48px] rounded-[14px] text-white font-[600] text-[14px] sm:text-[16px]'
 								disabled={loading}
 							>
 								{loading ? 'Loading...' : 'Sign In'}
