@@ -96,7 +96,7 @@ const LoginLayout = () => {
 								type='text'
 								value={phoneNumber}
 								onChange={e => setPhoneNumber(e.target.value)}
-								placeholder='yourphonenumber'
+								placeholder='Your Phone Number'
 								className='px-4 sm:px-[18px] py-3 sm:py-[12px] border-2 border-[#D8E0F0] rounded-[14px] outline-none text-[14px] sm:text-[16px]'
 							/>
 						</div>
@@ -111,7 +111,7 @@ const LoginLayout = () => {
 									type={showPassword ? 'text' : 'password'}
 									value={password}
 									onChange={e => setPassword(e.target.value)}
-									placeholder='yourpassword'
+									placeholder='Your Password'
 									className='w-full outline-none text-[14px] sm:text-[16px]'
 								/>
 								<button
