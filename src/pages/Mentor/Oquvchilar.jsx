@@ -1094,27 +1094,6 @@ const Oquvchilar = () => {
                       >
                         <FileText className="w-10 h-5" />
                       </button>
-                      <button
-                        onClick={() => handleViewDetails(student)}
-                        className="w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
-                        title="Ko'rish"
-                      >
-                        <Eye className="w-10 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(student)}
-                        className="w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
-                        title="Tahrirlash"
-                      >
-                        <Edit className="w-10 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(student.student_id)}
-                        className="w-10 h-10 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center transition-colors"
-                        title="O'chirish"
-                      >
-                        <Trash2 className="w-10 h-5" />
-                      </button>
                     </div>
                   </div>
                 </div>
