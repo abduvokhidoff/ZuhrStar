@@ -14,6 +14,7 @@ import {
 	BarChart,
 	Bar,
 } from 'recharts'
+import { NavLink } from 'react-router-dom'
 
 const Dashboard = () => {
 	const [paymentsData, setPaymentsData] = useState([])
@@ -635,12 +636,11 @@ const Dashboard = () => {
 				<div className='flex-1 bg-white rounded-[24px] p-4 sm:p-6'>
 					<div className='flex justify-between items-center mb-4'>
 						<p className='text-lg sm:text-[22px] font-[700]'>Xodimlar</p>
-						<a
-							href='/super-admin/employees'
+						<NavLink to='employees'
 							className='text-sm sm:text-[16px] font-[600] text-[#3F8CFF] whitespace-nowrap'
 						>
 							View all &gt;
-						</a>
+						</NavLink>
 					</div>
 					<div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4'>
 						{combinedEmployees.map((user, index) => (

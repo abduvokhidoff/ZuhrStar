@@ -37,7 +37,6 @@ const Aside = () => {
 			{ icon: LayoutGrid, label: 'Dashboard', path: '/mentor/' },
 			{ icon: Layers, label: `O'quvchilar`, path: `/mentor/o'quvchilar` },
 			{ icon: Video, label: `Google Meet`, path: `/mentor/google-meet` },
-			{ icon: Calendar, label: 'Kurslar', path: '/mentor/kurslar' },
 			{ icon: MessagesSquare, label: 'Guruhlar', path: '/mentor/guruhlar' },
 			{ icon: FolderOpen, label: 'Sozlamalar', path: '/mentor/sozlamalar' },
 		],

@@ -9,7 +9,6 @@ import SupportMentorLayout from '../layouts/SupportMentorLayout'
 
 import HeadMentorDashboard from '../pages/HeadMentor/Dashboard'
 import HeadMentorOquvchilar from '../pages/HeadMentor/Oquvchilar'
-import HeadMentorKurslar from '../pages/HeadMentor/Kurslar'
 import HeadMentorMentorlar from '../pages/HeadMentor/Mentorlar'
 import HeadMentorGuruhlar from '../pages/HeadMentor/Guruhlar'
 import HeadMentorHisobotlar from '../pages/HeadMentor/Hisobotlar'
@@ -43,7 +42,6 @@ import SuperAdminSozlamalar from '../pages/SuperAdmin/Sozlamalar'
 
 import MentorDashboard from '../pages/Mentor/Dashboard'
 import MentorOquvchilar from '../pages/Mentor/Oquvchilar'
-import MentorKurslar from '../pages/Mentor/Kurslar'
 import MentorGuruhlar from '../pages/Mentor/Guruhlar'
 import MentorSozlamalar from '../pages/Mentor/Sozlamalar'
 import MentorGoogleMeet from '../pages/Mentor/GoogleMeet'
@@ -119,7 +117,6 @@ const routes = createHashRouter([
 				children: [
 					{ index: true, element: <HeadMentorDashboard /> },
 					{ path: "o'quvchilar", element: <HeadMentorOquvchilar /> },
-					{ path: 'kurslar', element: <HeadMentorKurslar /> },
 					{ path: 'mentorlar', element: <HeadMentorMentorlar /> },
 					// 👇 NEW: detail page (selected mentor)
 					{ path: 'mentorlar/:id', element: <HeadMentorMentorDetail /> },
@@ -143,7 +140,6 @@ const routes = createHashRouter([
 				children: [
 					{ index: true, element: <MentorDashboard /> },
 					{ path: "o'quvchilar", element: <MentorOquvchilar /> },
-					{ path: 'kurslar', element: <MentorKurslar /> },
 					{ path: 'guruhlar', element: <MentorGuruhlar /> },
 					{ path: 'guruhlar/dars-jadvali', element: <DarsJadvali /> },
 					{ path: 'sozlamalar', element: <MentorSozlamalar /> },
