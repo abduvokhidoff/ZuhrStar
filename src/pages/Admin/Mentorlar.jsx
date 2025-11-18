@@ -121,21 +121,6 @@ export default function Mentorlar() {
     setModalOpen(true);
   };
 
-  const openEdit = (m) => {
-    setForm({
-      fullName: m.fullName || "",
-      phone: m.phone || "",
-      email: m.email || "",
-      company: m.company || "",
-      position: m.position || "",
-      location: m.location || "",
-      status: m.status || "active",
-    });
-    setSelectedMentor(m.teacher_id || m._id);
-    setIsEditing(true);
-    setModalOpen(true);
-  };
-
   const onFormChange = (e) => {
     const { name, value } = e.target;
     setForm((p) => ({ ...p, [name]: value }));
@@ -144,20 +129,6 @@ export default function Mentorlar() {
   const saveMentor = async (e) => {
     e.preventDefault();
     setSaving(true);
-    try {
-      if (isEditing && selectedMentor) {
-        await api.put(`/teachers/${selectedMentor}`, form);
-      } else {
-        await api.post("/teachers/register", form);
-      }
-      setModalOpen(false);
-      loadMentors();
-    } catch (err) {
-      console.error(err);
-      setError("Mentorni saqlashda xatolik yuz berdi.");
-    } finally {
-      setSaving(false);
-    }
   };
 
   const deleteMentor = async (mentor) => {
@@ -193,7 +164,7 @@ export default function Mentorlar() {
                 {isEditing ? "Mentorni tahrirlash" : "Yangi mentor yaratish"}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {["fullName", "phone", "email", "company", "position", "location"].map((f) => (
+                {["FullName", "Phone", "Email", "Branch"].map((f) => (
                   <input
                     key={f}
                     name={f}
@@ -203,15 +174,6 @@ export default function Mentorlar() {
                     className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 ))}
-                <select
-                  name="status"
-                  value={form.status}
-                  onChange={onFormChange}
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="active">Faol</option>
-                  <option value="inactive">Nofaol</option>
-                </select>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
@@ -293,55 +255,47 @@ export default function Mentorlar() {
 
       {/* Table */}
       <div className="bg-white rounded-lg shadow-sm mx-6 overflow-hidden mb-10">
-        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 grid grid-cols-7 gap-4 text-xs font-medium text-gray-500 uppercase">
-          <div>#</div>
-          <div>Rasm</div>
-          <div>F.I.Sh</div>
-          <div>Telefon</div>
-          <div>Email</div>
-          <div>Kompaniya</div>
-          <div className="text-center">Amallar</div>
+        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <div className="col-span-1">#</div>
+            <div className="col-span-1">Rasm</div>
+            <div className="col-span-3">F.I.Sh</div>
+            <div className="col-span-2">Telefon</div>
+            <div className="col-span-3">Email</div>
+            <div className="col-span-2">Kompaniya</div>
+          </div>
         </div>
 
-        <div className="divide-y divide-gray-100 ">
+        <div className="divide-y divide-gray-100">
           {loading ? (
-            <div className="text-center py-8">Yuklanmoqda...</div>
+            <div className="text-center py-8">
+              <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
+              <div className="text-gray-500">Yuklanmoqda...</div>
+            </div>
           ) : filteredMentors.length === 0 ? (
             <div className="text-center py-8 text-gray-500">Mentorlar topilmadi</div>
           ) : (
             filteredMentors.map((m, i) => (
               <div
                 key={m._id || i}
-                className="grid grid-cols-7 gap-4 items-center px-6 py-4 text-sm hover:bg-gray-50 transition-colors"
+                className="px-6 py-4 hover:bg-gray-50 transition-colors"
               >
-                <div>{i + 1}</div>
-                <div className="flex ">
-                  <img
-                    src={m.imgURL || "https://via.placeholder.com/40"}
-                    alt=""
-                    className="w-10 h-10 rounded-full object-cover"
-                    onError={(e) => {
-                      e.target.src = "https://via.placeholder.com/40";
-                    }}
-                  />
-                </div>
-                <div className="font-medium text-gray-800">{m.fullName}</div>
-                <div>{m.phone || "—"}</div>
-                <div>{m.email || "—"}</div>
-                <div>{m.company || "—"}</div>
-                <div className="flex justify-center gap-2">
-                  <button
-                    onClick={() => openEdit(m)}
-                    className="w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => deleteMentor(m)}
-                    className="w-10 h-10 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div className="grid grid-cols-12 gap-4 items-center text-sm">
+                  <div className="col-span-1 text-gray-900 font-medium">{i + 1}</div>
+                  <div className="col-span-1">
+                    <img
+                      src={m.imgURL || "https://via.placeholder.com/40"}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover"
+                      onError={(e) => {
+                        e.target.src = "https://via.placeholder.com/40";
+                      }}
+                    />
+                  </div>
+                  <div className="col-span-3 font-medium text-gray-900">{m.fullName}</div>
+                  <div className="col-span-2 text-gray-600">{m.phone || "—"}</div>
+                  <div className="col-span-3 text-gray-600">{m.email || "—"}</div>
+                  <div className="col-span-2 text-gray-600">{m.company || "—"}</div>
                 </div>
               </div>
             ))

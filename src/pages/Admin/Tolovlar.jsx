@@ -37,7 +37,9 @@ const P0 = {
   status: "paid", // paid | unpaid
 };
 
+
 export default function Tolovlar() {
+
   const dispatch = useDispatch();
   const { accessToken, refreshToken } = useSelector((s) => s.auth);
 
@@ -64,6 +66,21 @@ export default function Tolovlar() {
   // modal
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(P0);
+
+  const [searchStudent, setSearchStudent] = useState("");
+  const [showStudentsDropdown, setShowStudentsDropdown] = useState(false);
+
+  const [searchGroup, setSearchGroup] = useState("");
+  const [showGroupsDropdown, setShowGroupsDropdown] = useState(false);
+
+  const filteredStudents = students.filter(s =>
+    `${s.name} ${s.surname}`.toLowerCase().includes(searchStudent.toLowerCase())
+  );
+
+  const filteredGroups = groups.filter(g =>
+    g.name.toLowerCase().includes(searchGroup.toLowerCase())
+  );
+
 
   // ---------- AUTH HELPERS ----------
   const refreshAccessToken = async () => {
@@ -447,7 +464,7 @@ export default function Tolovlar() {
       const lowerCols = cols.map((c) => c.toLowerCase());
       const guess = (names) =>
         cols[
-          lowerCols.findIndex((lc) => names.some((n) => lc === n || lc.includes(n)))
+        lowerCols.findIndex((lc) => names.some((n) => lc === n || lc.includes(n)))
         ] || "";
 
       setMapping((m) => ({
@@ -604,54 +621,77 @@ export default function Tolovlar() {
               <h2 className="text-xl font-semibold mb-4">Yangi to‘lov qo‘shish</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Student */}
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">O‘quvchi</label>
-                  <select
+                {/* O‘quvchi */}
+                <div className="relative dropdown-container">
+                  <input
+                    placeholder="O‘quvchi qidirish..."
+                    value={form.student_id ? students.find(s => s.student_id === form.student_id)?.name : searchStudent}
+                    onChange={(e) => {
+                      setForm(p => ({ ...p, student_id: "" })); // оставляем
+                      setSearchStudent(e.target.value); // теперь ввод виден
+                      setShowStudentsDropdown(true);
+                    }}
                     className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.student_id}
-                    onChange={(e) => onSelectStudent(e.target.value)}
-                  >
-                    <option value="">— Tanlang —</option>
-                    {students.map((s) => {
-                      const name =
-                        `${s?.surname || ""} ${s?.name || ""}`
-                          .trim()
-                          .replace(/\s+/g, " ") || s.student_id;
-                      return (
-                        <option key={s.student_id} value={s.student_id}>
-                          {name} — {s.student_phone || "—"} {s.paid ? "✓ (paid)" : ""}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  />
+                  {showStudentsDropdown && (
+                    <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-44 overflow-y-auto z-10 shadow">
+                      {filteredStudents.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500">Topilmadi</div>
+                      ) : (
+                        filteredStudents.map(s => (
+                          <div
+                            key={s.student_id}
+                            onClick={() => {
+                              setForm(p => ({ ...p, student_id: s.student_id }));
+                              setShowStudentsDropdown(false);
+                            }}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                          >
+                            <div className="font-medium">{s.name} {s.surname}</div>
+                            <div className="text-xs text-gray-500">{s.student_phone}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Group */}
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Guruh</label>
-                  <select
+                {/* Guruh */}
+                <div className="relative dropdown-container">
+                  <input
+                    placeholder="Guruh qidirish..."
+                    value={form.group_id ? groups.find(g => g.group_id === form.group_id)?.name : searchGroup}
+                    onChange={(e) => {
+                      setForm(p => ({ ...p, group_id: "" }));
+                      setSearchGroup(e.target.value);
+                      setShowGroupsDropdown(true);
+                    }}
                     className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.group_id}
-                    onChange={(e) => onSelectGroup(e.target.value)}
-                  >
-                    <option value="">— Tanlang —</option>
-                    {groups.map((g) => (
-                      <option key={g.group_id} value={g.group_id}>
-                        {g.name} — {g.course}
-                      </option>
-                    ))}
-                  </select>
+
+                  />
+                  {showGroupsDropdown && (
+                    <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-44 overflow-y-auto z-10 shadow">
+                      {filteredGroups.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500">Topilmadi</div>
+                      ) : (
+                        filteredGroups.map(g => (
+                          <div
+                            key={g.group_id}
+                            onClick={() => {
+                              setForm(p => ({ ...p, group_id: g.group_id }));
+                              setShowGroupsDropdown(false);
+                            }}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                          >
+                            <div className="font-medium">{g.name}</div>
+                            <div className="text-xs text-gray-500">{g.course}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Course */}
-                <input
-                  name="course"
-                  placeholder="Kurs"
-                  value={form.course}
-                  onChange={onFormChange}
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
 
                 {/* Date */}
                 <div>
@@ -666,15 +706,26 @@ export default function Tolovlar() {
                 </div>
 
                 {/* Amount */}
-                <input
-                  name="amount"
-                  placeholder="Summa (so'm)"
-                  value={form.amount}
-                  onChange={onFormChange}
-                  type="number"
-                  min="0"
-                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Miqdori</label>
+                  <input
+                    name="amount"
+                    placeholder="Summa (so'm)"
+                    value={form.amount}
+                    onChange={onFormChange}
+                    type="number"
+                    min="0"
+                    className="w-full border h-[49.6px] border-gray-300 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{
+                      MozAppearance: "textfield",
+                      appearance: "textfield",        // <-- добавлено
+                    }}
+                  />
+                </div>
+
+
+
+
 
                 {/* Method */}
                 <div>
@@ -800,14 +851,13 @@ export default function Tolovlar() {
                       </div>
                     ))}
                   </div>
-
                   {/* Preview */}
                   <div className="border rounded-lg overflow-hidden">
                     <div className="bg-gray-50 px-4 py-2 text-xs text-gray-600">
                       Preview (birinchi 15 qator)
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs">
+                      <table className="min-w-full text-xs border-collapse table-auto">
                         <thead className="bg-white">
                           <tr>
                             {importCols.map((c) => (
@@ -1172,8 +1222,8 @@ export default function Tolovlar() {
                             c.method === "cash"
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : c.method === "transfer"
-                              ? "bg-blue-50 text-blue-700 border border-blue-200"
-                              : "bg-cyan-50 text-cyan-700 border border-cyan-200"
+                                ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                : "bg-cyan-50 text-cyan-700 border border-cyan-200"
                           )}
                         >
                           {methods.find((m) => m.value === c.method)?.label || c.method}

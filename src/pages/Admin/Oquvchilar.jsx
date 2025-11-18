@@ -34,6 +34,15 @@ const Oquvchilar = () => {
   const [showUpdate, setShowUpdate] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showDebtorsOnly, setShowDebtorsOnly] = useState(false);
+  const [searchGroup, setSearchGroup] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [showList, setShowList] = useState(false);
+
+  const filteredGroups = groups.filter(g =>
+    g.name.toLowerCase().includes(searchGroup.toLowerCase())
+  );
+
 
   const [form, setForm] = useState({
     name: '',
@@ -599,7 +608,7 @@ const Oquvchilar = () => {
         {/* CREATE MODAL */}
         {showCreate && (
           <div className="fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50">
-            <div className="bg-white p-6 rounded-xl shadow-xl w-96 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white p-6 rounded-xl shadow-xl w-[700px] max-h-[90vh] overflow-y-auto">
               <h2 className="text-xl font-semibold mb-4">O'quvchi Qo'shish</h2>
               {updateMessage.text && (
                 <div
@@ -675,20 +684,53 @@ const Oquvchilar = () => {
                 <option value="Ayol">Ayol</option>
               </select>
 
-              <select
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={createForm.group_id}
-                onChange={(e) =>
-                  setCreateForm({ ...createForm, group_id: e.target.value })
-                }
-              >
-                <option value="">Guruhni tanlang (ixtiyoriy)</option>
-                {groups.map((group) => (
-                  <option key={group._id || group.group_id} value={group.group_id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full mb-3">
+                {/* INPUT */}
+                <input
+                  type="text"
+                  placeholder="Guruhni tanlang (ixtiyoriy)"
+                  value={
+                    searchGroup
+                      ? searchGroup
+                      : createForm.group_id
+                        ? groups.find((g) => g.group_id === createForm.group_id)?.name
+                        : ""
+                  }
+                  onChange={(e) => {
+                    setSearchGroup(e.target.value)
+                    setShowList(true)
+                  }}
+                  onFocus={() => setShowList(true)}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+
+                {/* LIST */}
+                {showList && (
+                  <ul className="absolute w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg z-50">
+                    {filteredGroups.length === 0 ? (
+                      <li className="p-3 text-gray-500">Guruh topilmadi</li>
+                    ) : (
+                      filteredGroups.map((group) => (
+                        <li
+                          key={group._id || group.group_id}
+                          className="p-3 hover:bg-blue-100 cursor-pointer"
+                          onClick={() => {
+                            setCreateForm({
+                              ...createForm,
+                              group_id: group.group_id,
+                            });
+                            setSearchGroup("");
+                            setShowList(false);
+                          }}
+                        >
+                          {group.name}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
+
 
               <input
                 type="text"

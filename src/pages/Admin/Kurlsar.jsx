@@ -324,16 +324,7 @@ export default function Kurslar() {
     setModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Kursni o'chirishni tasdiqlaysizmi?")) return;
-    try {
-      await fetchWithAuth(`${apiBase}/api/courses/id/${id}`, { method: "DELETE" });
-      setCourses((prev) => prev.filter((c) => c._id !== id));
-      if (selectedCourse?._id === id) setSelectedCourse(null);
-    } catch {
-      setError("Kursni o'chirishda xatolik yuz berdi.");
-    }
-  };
+
 
   // ------- вычисления для детейла (включая просроченные группы) -------
   const detailData = useMemo(() => {
@@ -592,12 +583,11 @@ export default function Kurslar() {
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
               <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <div>ID</div>
-                <div className="col-span-3">Kurs nomi</div>
-                <div>Davomiylik</div>
-                <div>Guruhlar soni</div>
-                <div>Narx</div>
-                <div className="text-center col-span-3">Amallar</div>
+                <div className="col-span-1">ID</div>
+                <div className="col-span-4">Kurs nomi</div>
+                <div className="col-span-2">Davomiylik</div>
+                <div className="col-span-2">Guruhlar soni</div>
+                <div className="col-span-3">Narx</div>
               </div>
             </div>
 
@@ -619,52 +609,28 @@ export default function Kurslar() {
                     onClick={() => openCourseDetail(course)}
                   >
                     <div className="grid grid-cols-12 gap-4 items-center text-sm">
-                      <div className="text-gray-900">
+                      <div className="col-span-1 text-gray-900 font-medium">
                         {index + 1}
                       </div>
 
-
-                      <div className="col-span-3">
-                        <span className="font-medium">
+                      <div className="col-span-4">
+                        <span className="font-medium text-gray-900">
                           {course.name}
                         </span>
                       </div>
 
-                      <div className="text-gray-600">
+                      <div className="col-span-2 text-gray-600">
                         {course.duration} {course.duration_type === "week" ? "hafta" : course.duration_type === "day" ? "kun" : "oy"}
                       </div>
 
-                      <div>
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
-                          {course.groups_count}
+                      <div className="col-span-2">
+                        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                          {course.groups_count || 0}
                         </span>
                       </div>
 
-                      <div className="font-medium text-sm text-gray-800">
+                      <div className="col-span-3 font-medium text-gray-800">
                         {Number(course.price).toLocaleString()} UZS
-                      </div>
-
-                      <div className="flex gap-2 justify-center col-span-3">
-                        <button
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            handleEdit(course);
-                          }}
-                          className="w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
-                          title="Tahrirlash"
-                        >
-                          <Pencil className="w-10 h-5" />
-                        </button>
-                        <button
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            handleDelete(course._id);
-                          }}
-                          className="w-10 h-10 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center transition-colors"
-                          title="O‘chirish"
-                        >
-                          <Trash2 className="w-10 h-5" />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -733,6 +699,7 @@ export default function Kurslar() {
             </div>
 
             {/* Ученики курса */}
+            {/* Ученики курса */}
             <div>
               <h3 className="text-lg font-semibold mb-3">
                 O‘quvchilar ({detailData.courseStudents.length})
@@ -746,16 +713,13 @@ export default function Kurslar() {
                       <th className="px-4 py-3 text-left">Telefon</th>
                       <th className="px-4 py-3 text-left">Guruh(lar)</th>
                       <th className="px-4 py-3 text-left">Status</th>
-                      <th className="px-4 py-3 text-center">Amallar</th>
+                      <th className="px-4 py-3 text-left">Amallar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {detailData.courseStudents.length ? (
                       detailData.courseStudents.map((s, i) => {
-                        const full =
-                          `${s?.surname || ""} ${s?.name || ""}`.trim() ||
-                          s?.student_id ||
-                          "-";
+                        const full = `${s?.surname || ""} ${s?.name || ""}`.trim() || s?.student_id || "-";
                         const phone = s?.student_phone || s?.phone || "-";
                         const gIdsOfStudent = new Set(
                           (Array.isArray(s?.groups) ? s.groups.map(String) : [])
@@ -771,9 +735,7 @@ export default function Kurslar() {
                             <td className="px-4 py-2">{i + 1}</td>
                             <td className="px-4 py-2">{full}</td>
                             <td className="px-4 py-2">{phone}</td>
-                            <td className="px-4 py-2">
-                              {groupNames.length ? groupNames.join(", ") : "—"}
-                            </td>
+                            <td className="px-4 py-2">{groupNames.length ? groupNames.join(", ") : "—"}</td>
                             <td className="px-4 py-2">
                               <span
                                 className={
@@ -789,18 +751,18 @@ export default function Kurslar() {
                                 {status === "muzlagan" ? (
                                   <button
                                     onClick={() => unfreezeStudent(sid(s))}
-                                    className="w-9 h-9 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
+                                    className="w-8 h-8 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center"
                                     title="Aktivlashtirish"
                                   >
-                                    <Unlock className="w-5 h-5" />
+                                    <Unlock className="w-4 h-4" />
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => freezeStudent(sid(s))}
-                                    className="w-9 h-9 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
+                                    className="w-8 h-8 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center"
                                     title="Muzlatish"
                                   >
-                                    <Snowflake className="w-5 h-5" />
+                                    <Snowflake className="w-4 h-4" />
                                   </button>
                                 )}
                               </div>
@@ -819,6 +781,7 @@ export default function Kurslar() {
                 </table>
               </div>
             </div>
+
           </div>
         </div>
       )}
