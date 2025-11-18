@@ -3,11 +3,11 @@ import { useSelector, useDispatch } from 'react-redux'
 import { RefreshCw } from 'lucide-react'
 import { setCredentials, logout } from '../../redux/authSlice'
 
+// ❌ Sunday removed
 const DAY_FILTERS = [
-	{ key: 'odd_days', label: 'Тоқ', color: 'bg-blue-500' },
-	{ key: 'even_days', label: 'Жуфт', color: 'bg-green-500' },
-	{ key: 'every_days', label: 'Ҳар куни', color: 'bg-purple-500' },
-	{ key: 'sunday', label: 'Якшанба', color: 'bg-orange-500' },
+	{ key: 'odd_days', label: 'Toq', color: 'bg-blue-500' },
+	{ key: 'even_days', label: 'Juft', color: 'bg-blue-500' },
+	{ key: 'every_days', label: 'Har kuni', color: 'bg-blue-500' },
 ]
 
 const JadvalniKorish = () => {
@@ -26,6 +26,14 @@ const JadvalniKorish = () => {
 
 	const timeSlots = Array.from({ length: 13 }, (_, i) => `${i + 8}:00`)
 
+	// === Static 12 rooms ===
+	const ROOMS = Array.from({ length: 12 }, (_, i) => ({
+		id: i + 1,
+		name: `Хона ${i + 1}`,
+		color: i % 2 === 0 ? 'bg-blue-50' : 'bg-green-50',
+	}))
+
+	// === Refresh Token ===
 	const refreshAccessToken = useCallback(async () => {
 		if (!refreshToken) {
 			dispatch(logout())
@@ -60,11 +68,13 @@ const JadvalniKorish = () => {
 		}
 	}, [refreshToken, dispatch, user])
 
+	// === Fetch Groups ===
 	const fetchGroups = useCallback(async () => {
 		try {
 			setLoading(true)
 			const token = accessToken
 			if (!token) throw new Error('Нет accessToken')
+
 			let response = await fetch(
 				'https://zuhrstar-production.up.railway.app/api/groups/',
 				{
@@ -101,24 +111,17 @@ const JadvalniKorish = () => {
 	const handleFilterSelect = filterKey => setSelectedFilter(filterKey)
 	const handleRefresh = () => fetchGroups()
 
+	// === Sunday removed ===
 	function isGroupActiveForFilter(group) {
 		if (!group || group.status !== 'active') return false
 		const days = group.days || {}
 		if (selectedFilter === 'every_days') return days.every_days
 		if (selectedFilter === 'odd_days') return days.odd_days
 		if (selectedFilter === 'even_days') return days.even_days
-		if (selectedFilter === 'sunday') return days.sunday
 		return false
 	}
 
 	const filteredGroups = groups.filter(isGroupActiveForFilter)
-
-	// === Dinamik xona soni (guruhlar soniga qarab)
-	const ROOMS = filteredGroups.map((_, i) => ({
-		id: i + 1,
-		name: `Хона ${i + 1}`,
-		color: i % 2 === 0 ? 'bg-blue-50' : 'bg-green-50',
-	}))
 
 	function getTimeSlotPosition(time) {
 		if (!time) return -100
@@ -130,7 +133,21 @@ const JadvalniKorish = () => {
 		return ((totalMinutes - startMinutes) / (13 * 60)) * 100
 	}
 
-	const getGroupBlock = group => {
+	// === Random colors for groups ===
+	const COLORS = [
+		'bg-blue-500',
+		'bg-green-500',
+		'bg-purple-500',
+		'bg-pink-500',
+		'bg-yellow-500',
+		'bg-indigo-500',
+		'bg-red-500',
+		'bg-teal-500',
+		'bg-orange-500',
+		'bg-cyan-500',
+	]
+
+	const getGroupBlock = (group, index) => {
 		const startPosition = getTimeSlotPosition(group.start_time)
 		const endPosition = getTimeSlotPosition(group.end_time)
 		return {
@@ -139,10 +156,52 @@ const JadvalniKorish = () => {
 			subject: group.course || group.name,
 			startPosition,
 			width: Math.max(endPosition - startPosition, 6.25),
-			color: 'bg-blue-500',
+			color: COLORS[index % COLORS.length],
 			group,
 		}
 	}
+
+	// === Check if two groups overlap ===
+	const doGroupsOverlap = (group1, group2) => {
+		const start1 = group1.start_time
+		const end1 = group1.end_time
+		const start2 = group2.start_time
+		const end2 = group2.end_time
+
+		return start1 < end2 && end1 > start2
+	}
+
+	// === Assign rooms to groups ===
+	const assignRoomsToGroups = () => {
+		const roomAssignments = Array.from({ length: 12 }, () => [])
+
+		filteredGroups.forEach(group => {
+			let assigned = false
+
+			// Try to find a room without overlap
+			for (let roomIndex = 0; roomIndex < 12; roomIndex++) {
+				const roomGroups = roomAssignments[roomIndex]
+				const hasOverlap = roomGroups.some(existingGroup =>
+					doGroupsOverlap(group, existingGroup)
+				)
+
+				if (!hasOverlap) {
+					roomAssignments[roomIndex].push(group)
+					assigned = true
+					break
+				}
+			}
+
+			// If no room found, add to first room (shouldn't happen with 12 rooms)
+			if (!assigned) {
+				roomAssignments[0].push(group)
+			}
+		})
+
+		return roomAssignments
+	}
+
+	const roomAssignments = assignRoomsToGroups()
 
 	const handleMouseEnter = (event, group) => {
 		setHoveredGroup(group)
@@ -157,13 +216,13 @@ const JadvalniKorish = () => {
 		}
 	}
 
+	// === Sunday removed ===
 	const getDaysList = days => {
 		if (!days) return 'Белгиланмаган'
 		const activeDays = []
 		if (days.odd_days) activeDays.push('Тоқ кунлар')
 		if (days.even_days) activeDays.push('Жуфт кунлар')
 		if (days.every_days) activeDays.push('Ҳар куни')
-		if (days.sunday) activeDays.push('Якшанба')
 		return activeDays.join(', ')
 	}
 
@@ -185,7 +244,7 @@ const JadvalniKorish = () => {
 					</button>
 				</div>
 
-				{/* Filter buttons */}
+				{/* DAY FILTERS (No Sunday) */}
 				<div className='bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200 px-6 py-4'>
 					<div className='flex space-x-3'>
 						{DAY_FILTERS.map(filter => (
@@ -204,7 +263,7 @@ const JadvalniKorish = () => {
 					</div>
 				</div>
 
-				{/* Time header */}
+				{/* Time Header */}
 				<div className='flex border-b border-gray-200 bg-gray-50'>
 					{timeSlots.map(time => (
 						<div
@@ -216,20 +275,21 @@ const JadvalniKorish = () => {
 					))}
 				</div>
 
-				{/* Groups by room */}
+				{/* Groups */}
 				{loading ? (
 					<div className='p-8 text-center text-gray-500'>Загрузка...</div>
 				) : error ? (
 					<div className='p-8 text-center text-red-500'>{error}</div>
 				) : (
 					<div className='divide-y divide-gray-200'>
-						{ROOMS.map((room, i) => {
-							const group = filteredGroups[i]
-							if (!group) return null
-							const block = getGroupBlock(group)
+						{ROOMS.map((room, roomIndex) => {
+							const roomGroups = roomAssignments[roomIndex]
 
 							return (
-								<div key={room.id} className='flex min-h-20 relative'>
+								<div
+									key={room.id}
+									className='flex min-h-20 relative hover:bg-gray-50 transition-colors'
+								>
 									{/* Grid */}
 									<div className='absolute inset-0 flex'>
 										{timeSlots.map((_, j) => (
@@ -240,23 +300,31 @@ const JadvalniKorish = () => {
 										))}
 									</div>
 
-									{/* Group Block */}
-									<div
-										className={`absolute ${block.color} text-white text-xs px-2 py-1 rounded font-medium cursor-pointer hover:opacity-90 transition-opacity`}
-										style={{
-											left: `${block.startPosition}%`,
-											width: `${block.width}%`,
-											height: '36px',
-											top: '12px',
-										}}
-										onMouseEnter={e => handleMouseEnter(e, block.group)}
-										onMouseLeave={handleMouseLeave}
-									>
-										{block.subject} ({block.startTime}-{block.endTime})
-									</div>
+									{/* Multiple Groups in one room */}
+									{roomGroups.map((group, groupIndex) => {
+										const block = getGroupBlock(group, groupIndex)
+										return (
+											<div
+												key={`${room.id}-${groupIndex}`}
+												className={`absolute ${block.color} text-white text-xs px-2 py-1 rounded-lg font-medium cursor-pointer hover:opacity-90 hover:scale-105 transition-all duration-200 shadow-md`}
+												style={{
+													left: `${block.startPosition}%`,
+													width: `${block.width}%`,
+													height: '36px',
+													top: '12px',
+												}}
+												onMouseEnter={e => handleMouseEnter(e, block.group)}
+												onMouseLeave={handleMouseLeave}
+											>
+												<div className='truncate'>
+													{block.subject} ({block.startTime}-{block.endTime})
+												</div>
+											</div>
+										)
+									})}
 
 									{/* Room Label */}
-									<div className='absolute left-2 top-1/2 -translate-y-1/2 text-gray-700 font-medium'>
+									<div className='absolute left-2 top-1/2 -translate-y-1/2 text-gray-700 font-semibold text-sm bg-white px-2 py-1 rounded shadow-sm'>
 										{room.name}
 									</div>
 								</div>
