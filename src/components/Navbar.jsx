@@ -15,18 +15,7 @@ const Navbar = () => {
 	}
 
 	return (
-		<div className='w-full h-[70px] flex justify-between items-center px-[24px] '>
-			{/* Search bar */}
-			<div className='w-[40%]'>
-				<div className='flex items-center gap-[10px] px-[20px] py-[10px] rounded-[10px] bg-[white] w-[100%]'>
-					<Search size={20} />
-					<input
-						type='text'
-						placeholder='Search'
-						className='outline-none w-[100%]'
-					/>
-				</div>
-			</div>
+		<div className='w-full h-[70px] flex justify-end items-center px-[24px] '>
 
 			{/* User info & logout */}
 			<div className='flex items-center gap-[20px]'>
@@ -38,7 +27,6 @@ const Navbar = () => {
 
 					{/* Username */}
 					<p className='font-[Nunito Sans] font-[600] text-[14px] text-[black]'>
-						<span className='font-[700]'>Hello</span>{' '}
 						{user?.fullName || 'Guest'}
 					</p>
 				</div>
@@ -49,7 +37,7 @@ const Navbar = () => {
 					className='flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition'
 				>
 					<LogOut size={18} />
-					Logout
+					Logout.
 				</button>
 			</div>
 		</div>

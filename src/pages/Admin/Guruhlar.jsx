@@ -10,8 +10,11 @@ import {
   Search,
   Download,
   RefreshCw,
+  ArrowLeft,
+  UserPlus,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { setCredentials } from "../../redux/authSlice";
 
 const API_BASE =
@@ -19,6 +22,7 @@ const API_BASE =
   "https://zuhrstar-production.up.railway.app";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
+const isoDate = (d) => new Date(d).toISOString().slice(0, 10);
 
 const F0 = {
   name: "",
@@ -36,20 +40,23 @@ const F0 = {
 
 export default function Guruhlar() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { accessToken, refreshToken } = useSelector((s) => s.auth);
 
   // DATA
   const [groups, setGroups] = useState([]);
   const [students, setStudents] = useState([]);
-
-  // lists for selects
   const [courses, setCourses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [branches, setBranches] = useState([]);
 
+  // VIEW STATE
+  const [showGroupDetails, setShowGroupDetails] = useState(false);
+  const [currentGroup, setCurrentGroup] = useState(null);
+  const [attendanceMap, setAttendanceMap] = useState({});
+
   // UI/STATE
   const [loading, setLoading] = useState(true);
+  const [loadingStudents, setLoadingStudents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -57,12 +64,49 @@ export default function Guruhlar() {
   const [showFilter, setShowFilter] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
 
+  // GROUP MODAL
   const [modalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(F0);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
 
-  // dropdown UI for course/teacher/branch
+  // STUDENT MODALS
+  const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [studentTab, setStudentTab] = useState("attach");
+  const [studentSaving, setStudentSaving] = useState(false);
+  const [studentModalError, setStudentModalError] = useState("");
+  const [attachSearch, setAttachSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+
+  // EDIT STUDENT
+  const [editStudentOpen, setEditStudentOpen] = useState(false);
+  const [editStudentSaving, setEditStudentSaving] = useState(false);
+  const [editStudentError, setEditStudentError] = useState("");
+  const [editStudentForm, setEditStudentForm] = useState({
+    student_id: "",
+    name: "",
+    surname: "",
+    student_phone: "",
+    parents_phone: "",
+    birth_date: "",
+    gender: "",
+    note: "",
+    status: "active",
+  });
+
+  // CREATE STUDENT
+  const [createStudentForm, setCreateStudentForm] = useState({
+    name: "",
+    surname: "",
+    student_phone: "",
+    parents_phone: "",
+    birth_date: "",
+    gender: "",
+    note: "",
+    status: "active",
+  });
+
+  // dropdown UI
   const [showCoursesDropdown, setShowCoursesDropdown] = useState(false);
   const [showTeachersDropdown, setShowTeachersDropdown] = useState(false);
   const [showBranchesDropdown, setShowBranchesDropdown] = useState(false);
@@ -98,7 +142,7 @@ export default function Guruhlar() {
         ...options,
         headers: {
           "Content-Type": "application/json",
-          ...(t ? { Authorization: `Bearer ${t}` } : {}),
+          Authorization: `Bearer ${t}`,
           ...(options.headers || {}),
         },
       });
@@ -116,9 +160,8 @@ export default function Guruhlar() {
         throw new Error(
           `HTTP ${res.status} ${res.statusText}${j?.message ? " — " + j.message : ""}`
         );
-      } catch (parseErr) {
-        // If JSON parse fails, throw original error with text
-        throw new Error(`HTTP ${res.status} ${res.statusText}: ${txt.slice(0, 200)}`);
+      } catch {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
       }
     }
     try {
@@ -129,6 +172,31 @@ export default function Guruhlar() {
   };
 
   // ---------- LOAD DATA ----------
+  const loadAttendanceToday = async (gid) => {
+    if (!gid) return setAttendanceMap({});
+    try {
+      const list = await fetchWithAuth(`${API_BASE}/api/attendance`);
+      const arr = Array.isArray(list) ? list : (list?.data ?? []);
+      const today = isoDate(new Date());
+      const filtered = arr.filter(
+        (r) =>
+          String(r.group_id) === String(gid) &&
+          r.date &&
+          isoDate(r.date) === today
+      );
+      const map = {};
+      filtered
+        .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt))
+        .forEach((r) => {
+          map[r.student_id] = !!r.status;
+        });
+      setAttendanceMap(map);
+    } catch (e) {
+      console.error(e);
+      setAttendanceMap({});
+    }
+  };
+
   const loadAll = async () => {
     if (!accessToken) return;
     setLoading(true);
@@ -148,7 +216,6 @@ export default function Guruhlar() {
     }
   };
 
-  // fetch courses, teachers and branches for selects
   const loadLists = async () => {
     if (!accessToken) return;
     try {
@@ -168,10 +235,8 @@ export default function Guruhlar() {
   useEffect(() => {
     loadAll();
     loadLists();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (!e.target.closest('.dropdown-container')) {
@@ -184,11 +249,58 @@ export default function Guruhlar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ---------- VIEW GROUP DETAILS ----------
+  const viewGroupDetails = async (group) => {
+    setCurrentGroup(group);
+    setShowGroupDetails(true);
+    setLoadingStudents(true);
+
+    const gid = group?.group_id ? String(group.group_id) : null;
+    await loadAttendanceToday(gid);
+    setLoadingStudents(false);
+  };
+
+  const backToGroups = () => {
+    setShowGroupDetails(false);
+    setCurrentGroup(null);
+    setAttendanceMap({});
+  };
+
+
   // ---------- STATS ----------
   const totalGroups = groups.length;
   const activeGroups = groups.filter((g) => (g.status || "").toLowerCase() === "active").length;
   const emptyGroups = groups.filter((g) => !Array.isArray(g.students) || g.students.length === 0).length;
   const totalStudents = students.length;
+
+  // ---------- GROUP STUDENTS ----------
+  const groupIdStr = currentGroup?.group_id ? String(currentGroup.group_id) : null;
+
+  const groupStudents = useMemo(() => {
+    if (!groupIdStr) return [];
+    return students.filter((s) =>
+      Array.isArray(s.groups) ? s.groups.map(String).includes(groupIdStr) : false
+    );
+  }, [students, groupIdStr]);
+
+  const filteredGroupStudents = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return groupStudents;
+    return groupStudents.filter((s) => {
+      const hay = `${s.surname || ""} ${s.name || ""} ${s.student_phone || ""} ${(s.status || "")}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [groupStudents, searchTerm]);
+
+  const attachList = useMemo(() => {
+    const q = attachSearch.trim().toLowerCase();
+    return students
+      .filter((s) => !Array.isArray(s.groups) || !s.groups.map(String).includes(groupIdStr || ""))
+      .filter((s) => {
+        const hay = `${s.surname || ""} ${s.name || ""} ${s.student_phone || ""}`.toLowerCase();
+        return hay.includes(q);
+      });
+  }, [students, attachSearch, groupIdStr]);
 
   // ---------- FILTERING ----------
   const filteredGroups = useMemo(() => {
@@ -200,7 +312,6 @@ export default function Guruhlar() {
     });
   }, [groups, searchTerm]);
 
-  // ---------- select filtering helpers ----------
   const filteredCourses = useMemo(() => {
     const q = (form.course || "").trim().toLowerCase();
     if (!q) return courses;
@@ -219,7 +330,7 @@ export default function Guruhlar() {
     return branches.filter((b) => (b.title || "").toLowerCase().includes(q));
   }, [form.branch, branches]);
 
-  // ---------- FORM ----------
+  // ---------- GROUP FORM ----------
   const openCreate = () => {
     setForm(F0);
     setIsEditing(false);
@@ -236,7 +347,7 @@ export default function Guruhlar() {
       branch: g.branch || "Asosiy filial",
       start_time: g.start_time || "",
       end_time: g.end_time || "",
-      start_date: g.start_date ? (typeof g.start_date === "string" && g.start_date.includes("T") ? g.start_date.slice(0,10) : g.start_date) : "",
+      start_date: g.start_date ? (typeof g.start_date === "string" && g.start_date.includes("T") ? g.start_date.slice(0, 10) : g.start_date) : "",
       status: g.status || "active",
       days: g.days || { odd_days: false, even_days: true, every_days: false },
       telegramChatId: g.telegramChatId || "",
@@ -257,17 +368,6 @@ export default function Guruhlar() {
       }));
       return;
     }
-
-    if (name === "start_date") {
-      const newStart = value;
-      setForm((p) => {
-        const duration = getSelectedCourseDuration(p.course);
-        const end = duration ? calculateEndDateFromString(newStart, duration) : "";
-        return { ...p, start_date: newStart };
-      });
-      return;
-    }
-
     setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
   };
 
@@ -277,35 +377,19 @@ export default function Guruhlar() {
     return found ? found.duration || 0 : 0;
   };
 
-  const calculateEndDateFromString = (startStr, months) => {
-    if (!startStr) return "";
-    const start = new Date(startStr);
-    if (Number.isNaN(start.getTime())) return "";
-    start.setMonth(start.getMonth() + Number(months || 0));
-    return start.toISOString().slice(0, 10);
-  };
-
-  // when user clicks a course in dropdown
   const selectCourse = (course) => {
     const groupNumber = 1000 + groups.length + 1;
     const namePrefix = (course.name?.[0] || "G").toUpperCase();
     const generatedName = `${namePrefix}-${groupNumber}`;
-
-    setForm((p) => ({
-      ...p,
-      course: course.name,
-      name: generatedName,
-    }));
+    setForm((p) => ({ ...p, course: course.name, name: generatedName }));
     setShowCoursesDropdown(false);
   };
 
-  // when user clicks a teacher in dropdown
   const selectTeacher = (teacher) => {
     setForm((p) => ({ ...p, teacher_fullName: teacher.fullName }));
     setShowTeachersDropdown(false);
   };
 
-  // when user clicks a branch in dropdown
   const selectBranch = (branch) => {
     setForm((p) => ({ ...p, branch: branch.title }));
     setShowBranchesDropdown(false);
@@ -313,11 +397,9 @@ export default function Guruhlar() {
 
   const ensureISODate = (d) => {
     if (!d) return "";
-    // if already ISO-like with T, return as-is
     if (typeof d === "string" && d.includes("T")) return d;
     try {
-      const iso = new Date(d).toISOString();
-      return iso;
+      return new Date(d).toISOString();
     } catch {
       return d;
     }
@@ -330,27 +412,22 @@ export default function Guruhlar() {
     e.preventDefault();
     if (saving) return;
 
-    // Validate required fields
     if (!form.name || !form.name.trim()) {
       setError("Guruh nomi bo'sh bo'lmasligi kerak");
       return;
     }
-
     if (!form.course || !form.course.trim()) {
       setError("Kurs tanlanishi kerak");
       return;
     }
-
     if (!form.start_date || !String(form.start_date).trim()) {
       setError("Boshlanish sanasi kiritilishi kerak");
       return;
     }
-
     if (!form.start_time || !String(form.start_time).trim()) {
       setError("Boshlanish vaqti kiritilishi kerak");
       return;
     }
-
     if (!form.end_time || !String(form.end_time).trim()) {
       setError("Tugash vaqti kiritilishi kerak");
       return;
@@ -359,11 +436,9 @@ export default function Guruhlar() {
     setSaving(true);
     setError("");
 
-    // Build payload matching backend schema
     const payload = {
       name: form.name.trim(),
       course: form.course.trim(),
-      // backend example uses ISO date strings for start_date/end_date - use ISO
       start_date: ensureISODate(form.start_date),
       start_time: form.start_time.trim(),
       end_time: form.end_time.trim(),
@@ -375,27 +450,18 @@ export default function Guruhlar() {
       },
     };
 
-    // Add optional fields only if they have values
     if (form.teacher_fullName && form.teacher_fullName.trim()) {
       payload.teacher_fullName = form.teacher_fullName.trim();
     }
-
     if (form.branch && form.branch.trim()) {
       payload.branch = form.branch.trim();
     }
-
-    // telegramChatId is required by backend in current API -> ensure present
     if (form.telegramChatId && String(form.telegramChatId).trim()) {
       payload.telegramChatId = String(form.telegramChatId).trim();
-    } else if (isEditing && form._id) {
-      // try keep existing id if editing and it was present in form._id (not ideal but better than generating new)
-      payload.telegramChatId = form.telegramChatId || makeTelegramChatId();
     } else {
-      // generate a temporary telegramChatId to satisfy backend validation
       payload.telegramChatId = makeTelegramChatId();
     }
 
-    // Optionally compute end_date from selected course duration (if backend wants end_date)
     const durationMonths = getSelectedCourseDuration(form.course);
     if (durationMonths) {
       try {
@@ -404,22 +470,16 @@ export default function Guruhlar() {
           start.setMonth(start.getMonth() + Number(durationMonths || 0));
           payload.end_date = start.toISOString();
         }
-      } catch {
-        // ignore
-      }
+      } catch { }
     }
-
-    console.log("📤 Sending payload:", JSON.stringify(payload, null, 2));
 
     try {
       if (isEditing && selectedGroupId) {
-        // Use ID if available, otherwise fall back to encoded name (for compat)
         const idToUse = encodeURIComponent(selectedGroupId);
         await fetchWithAuth(`${API_BASE}/api/groups/${idToUse}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-        console.log("✅ Group updated successfully");
         const fresh = await fetchWithAuth(`${API_BASE}/api/groups`);
         setGroups(Array.isArray(fresh) ? fresh : []);
       } else {
@@ -427,9 +487,6 @@ export default function Guruhlar() {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        console.log("✅ Server response:", created);
-
-        // Handle different response formats
         let newG;
         if (Array.isArray(created)) {
           newG = created[0];
@@ -440,12 +497,9 @@ export default function Guruhlar() {
         } else {
           newG = created;
         }
-
         if (newG) {
-          // Normalize date fields to expected display format (keep style)
           setGroups((prev) => [newG, ...prev]);
         } else {
-          // If no group returned, reload all groups
           await loadAll();
         }
       }
@@ -454,13 +508,8 @@ export default function Guruhlar() {
       setSelectedGroupId(null);
       setError("");
     } catch (e2) {
-      console.error("❌ Save error:", e2);
-      // If error message contains JSON, show the server message
-      if (e2?.message) {
-        setError(e2.message);
-      } else {
-        setError("Guruhni saqlashda xatolik yuz berdi.");
-      }
+      console.error(e2);
+      setError(e2?.message || "Guruhni saqlashda xatolik yuz berdi.");
     } finally {
       setSaving(false);
     }
@@ -469,7 +518,6 @@ export default function Guruhlar() {
   const deleteGroup = async (idOrName) => {
     if (!window.confirm("Guruhni o'chirishni tasdiqlaysizmi?")) return;
     try {
-      // Prefer ID if it's an object id, otherwise pass as-is
       const encoded = encodeURIComponent(idOrName);
       await fetchWithAuth(`${API_BASE}/api/groups/${encoded}`, {
         method: "DELETE",
@@ -484,15 +532,661 @@ export default function Guruhlar() {
     }
   };
 
-  // ---------- NAVIGATION TO GROUP STUDENTS ----------
-  const goToGroup = (g) => {
-    const name = g.name || "";
-    navigate(`/admin/guruhlar/${encodeURIComponent(name)}/students`, {
-      state: { groupSnapshot: g },
+  // ---------- STUDENT ACTIONS ----------
+  const openAddStudent = () => {
+    setStudentModalError("");
+    setSelectedStudentId("");
+    setCreateStudentForm({
+      name: "",
+      surname: "",
+      student_phone: "",
+      parents_phone: "",
+      birth_date: "",
+      gender: "",
+      note: "",
+      status: "active",
     });
+    setStudentTab("attach");
+    setStudentModalOpen(true);
   };
 
-  // ---------- RENDER ----------
+  const attachExisting = async (e) => {
+    e.preventDefault();
+    if (!groupIdStr) return setStudentModalError("Guruhda group_id yo'q.");
+    if (!selectedStudentId) return setStudentModalError("O'quvchini tanlang.");
+
+    try {
+      setStudentSaving(true);
+      const current = await fetchWithAuth(`${API_BASE}/api/students/${selectedStudentId}`);
+      if (!current) throw new Error("Student not found");
+
+      const curGroups = Array.isArray(current.groups) ? current.groups.map(String) : [];
+      if (!curGroups.includes(groupIdStr)) curGroups.push(groupIdStr);
+
+      const payload = {
+        name: current.name ?? "",
+        surname: current.surname ?? "",
+        student_phone: current.student_phone ?? "",
+        parents_phone: current.parents_phone ?? "",
+        birth_date: current.birth_date ?? "",
+        gender: current.gender ?? "",
+        note: current.note ?? "",
+        status: current.status ?? "active",
+        imgURL: current.imgURL ?? undefined,
+        group_attached: true,
+        groups: curGroups,
+      };
+
+      await fetchWithAuth(`${API_BASE}/api/students/${selectedStudentId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+
+      setStudents((prev) =>
+        prev.map((x) =>
+          (x.student_id || x._id) === selectedStudentId ? { ...x, ...current, groups: curGroups } : x
+        )
+      );
+      setStudentModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      setStudentModalError("Guruhga biriktirishda xatolik yuz berdi.");
+    } finally {
+      setStudentSaving(false);
+    }
+  };
+
+  const createAndAttach = async (e) => {
+    e.preventDefault();
+    if (!groupIdStr) return setStudentModalError("Guruhda group_id yo'q.");
+    if (!createStudentForm.name.trim() || !createStudentForm.surname.trim() || !createStudentForm.student_phone.trim()) {
+      return setStudentModalError("Familiya, Ism va Telefon majburiy.");
+    }
+
+    try {
+      setStudentSaving(true);
+      const payload = {
+        name: createStudentForm.name.trim(),
+        surname: createStudentForm.surname.trim(),
+        student_phone: createStudentForm.student_phone.trim(),
+        parents_phone: createStudentForm.parents_phone.trim(),
+        birth_date: createStudentForm.birth_date.trim(),
+        gender: createStudentForm.gender.trim(),
+        note: createStudentForm.note.trim(),
+        status: createStudentForm.status || "active",
+        group_attached: true,
+        groups: [groupIdStr],
+      };
+
+      const created = await fetchWithAuth(`${API_BASE}/api/students`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      const newS = Array.isArray(created) ? created[0] : created?.data ?? created;
+      if (newS) setStudents((prev) => [newS, ...prev]);
+
+      setStudentModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      setStudentModalError("Yangi o'quvchini yaratishda xatolik yuz berdi.");
+    } finally {
+      setStudentSaving(false);
+    }
+  };
+
+  const openEditStudent = (s) => {
+    setEditStudentError("");
+    setEditStudentForm({
+      student_id: s.student_id || s._id || "",
+      name: s.name || "",
+      surname: s.surname || "",
+      student_phone: s.student_phone || "",
+      parents_phone: s.parents_phone || "",
+      birth_date: (s.birth_date || "").slice(0, 10),
+      gender: s.gender || "",
+      note: s.note || "",
+      status: s.status || "active",
+    });
+    setEditStudentOpen(true);
+  };
+
+  const saveEditStudent = async (e) => {
+    e.preventDefault();
+    if (!editStudentForm.student_id) return setEditStudentError("Talaba ID topilmadi.");
+    try {
+      setEditStudentSaving(true);
+      const payload = {
+        name: editStudentForm.name.trim(),
+        surname: editStudentForm.surname.trim(),
+        student_phone: editStudentForm.student_phone.trim(),
+        parents_phone: editStudentForm.parents_phone?.trim() || undefined,
+        birth_date: editStudentForm.birth_date?.trim() || undefined,
+        gender: editStudentForm.gender?.trim() || undefined,
+        note: editStudentForm.note?.trim() || undefined,
+        status: editStudentForm.status || "active",
+      };
+      await fetchWithAuth(`${API_BASE}/api/students/${editStudentForm.student_id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      setStudents((prev) =>
+        prev.map((x) =>
+          (x.student_id || x._id) === editStudentForm.student_id ? { ...x, ...payload } : x
+        )
+      );
+      setEditStudentOpen(false);
+    } catch (err) {
+      console.error(err);
+      setEditStudentError("O'quvchini yangilashda xatolik yuz berdi.");
+    } finally {
+      setEditStudentSaving(false);
+    }
+  };
+
+  const deleteStudent = async (s) => {
+    const id = s.student_id || s._id;
+    if (!id) return;
+    if (!window.confirm("Ushbu o'quvchini butunlay o'chirishni tasdiqlaysizmi?")) return;
+    try {
+      await fetchWithAuth(`${API_BASE}/api/students/${id}`, { method: "DELETE" });
+      setStudents((prev) => prev.filter((x) => (x.student_id || x._id) !== id));
+    } catch (err) {
+      console.error(err);
+      alert("O'chirishda xatolik yuz berdi.");
+    }
+  };
+
+  // ---------- GROUP DETAILS VIEW ----------
+  if (showGroupDetails && currentGroup) {
+    const totalSt = filteredGroupStudents.length;
+    const activeSt = filteredGroupStudents.filter((x) => (x.status || "").toLowerCase() === "active").length;
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={backToGroups}
+                className="px-3 py-2 rounded-lg hover:bg-gray-100"
+                title="Orqaga"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-800">
+                  {currentGroup.name || "Guruh"}
+                </h1>
+                <div className="text-sm text-gray-500 mt-1">
+                  {currentGroup.course || "Kurs"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Info */}
+          <div className="px-1 pt-3 text-sm text-gray-600">
+            <span className="mr-4">
+              <b>Mentor:</b> {currentGroup.teacher_fullName || "—"}
+            </span>
+            <span className="mr-4">
+              <b>Kunlar:</b>{" "}
+              {currentGroup.days
+                ? [
+                  currentGroup.days.odd_days ? "Toq" : null,
+                  currentGroup.days.even_days ? "Juft" : null,
+                  currentGroup.days.every_days ? "Har kuni" : null,
+                ].filter(Boolean).join(", ")
+                : "—"}
+            </span>
+            <span className="mr-4">
+              <b>Vaqt:</b>{" "}
+              {currentGroup.start_time && currentGroup.end_time
+                ? `${currentGroup.start_time}–${currentGroup.end_time}`
+                : currentGroup.start_time || currentGroup.end_time || "—"}
+            </span>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="p-6">
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg p-6 border-l-4 border-emerald-500 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-gray-800 mb-1">{totalSt}</div>
+                  <div className="text-sm text-gray-500 uppercase font-medium">JAMI O'QUVCHILAR</div>
+                </div>
+                <div className="text-emerald-500">
+                  <Users className="w-8 h-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-gray-800 mb-1">{activeSt}</div>
+                  <div className="text-sm text-gray-500 uppercase font-medium">FAOL</div>
+                </div>
+                <div className="text-blue-500">
+                  <Users className="w-8 h-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-6 border-l-4 border-orange-500 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-gray-800 mb-1">{totalSt - activeSt}</div>
+                  <div className="text-sm text-gray-500 uppercase font-medium">NOFAOL</div>
+                </div>
+                <div className="text-orange-500">
+                  <Users className="w-8 h-8" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Qidirish ..."
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-64 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  loadAll();
+                  if (groupIdStr) loadAttendanceToday(groupIdStr);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Yangilash
+              </button>
+              <button
+                onClick={openAddStudent}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600"
+              >
+                <UserPlus className="w-4 h-4" />
+                O'quvchi qo'shish
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+              <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div>#</div>
+                <div className="col-span-3">F.I.Sh</div>
+                <div>Telefon</div>
+                <div>Jinsi</div>
+                <div>Status</div>
+                <div>Davomat</div>
+                <div>ID</div>
+                <div className="text-center">Amallar</div>
+              </div>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              {loadingStudents ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
+                  <div className="text-gray-500">Yuklanmoqda...</div>
+                </div>
+              ) : filteredGroupStudents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Bu guruhda hozircha talabalar yo'q.
+                </div>
+              ) : (
+                filteredGroupStudents.map((s, i) => {
+                  const full = `${s.surname || ""} ${s.name || ""}`.trim() || "—";
+                  const statusOk = (s.status || "").toLowerCase() === "active";
+                  const sid = s.student_id || s._id;
+                  const came = attendanceMap[sid];
+
+                  return (
+                    <div className="px-6 py-3" key={sid || i}>
+                      <div className="grid grid-cols-10 gap-4 items-center text-sm">
+                        <div className="font-medium">{i + 1}</div>
+                        <div className="col-span-3 font-medium text-gray-900">{full}</div>
+                        <div className="text-gray-700">{s.student_phone || s.phone || "—"}</div>
+                        <div className="text-gray-700">{s.gender || "—"}</div>
+                        <div>
+                          <span
+                            className={cls(
+                              "px-2 py-0.5 rounded text-white text-xs",
+                              statusOk ? "bg-green-500" : "bg-red-500"
+                            )}
+                          >
+                            {s.status || "—"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-start">
+                          {came === true ? (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" title="Keldi" />
+                          ) : came === false ? (
+                            <XCircle className="w-5 h-5 text-red-600" title="Kelmadi" />
+                          ) : (
+                            <span className="text-gray-300" title="Ma'lumot yo'q">—</span>
+                          )}
+                        </div>
+
+                        <div className="text-gray-500">{sid || "—"}</div>
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => openEditStudent(s)}
+                            className="w-9 h-9 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
+                            title="Tahrirlash"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteStudent(s)}
+                            className="w-9 h-9 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center transition-colors"
+                            title="O'chirish"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Add/Attach Student Modal */}
+        {studentModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
+            <div className="bg-white p-6 rounded-xl shadow-xl w-[720px] max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  className={cls(
+                    "px-4 py-2 rounded-lg border",
+                    studentTab === "attach" ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-gray-200"
+                  )}
+                  onClick={() => setStudentTab("attach")}
+                >
+                  Mavjud o'quvchini biriktirish
+                </button>
+                <button
+                  className={cls(
+                    "px-4 py-2 rounded-lg border",
+                    studentTab === "create" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-gray-200"
+                  )}
+                  onClick={() => setStudentTab("create")}
+                >
+                  Yangi o'quvchi yaratish
+                </button>
+              </div>
+
+              {studentTab === "attach" ? (
+                <form onSubmit={attachExisting}>
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="O'quvchi qidirish (F.I.Sh yoki telefon)..."
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={attachSearch}
+                      onChange={(e) => setAttachSearch(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="rounded-lg divide-y max-h-72 overflow-auto">
+                    {attachList.length ? (
+                      attachList.map((s) => {
+                        const full = `${s?.surname || ""} ${s?.name || ""}`.trim() || s?.student_id || "-";
+                        return (
+                          <label
+                            key={s.student_id || s._id}
+                            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <input
+                              type="radio"
+                              name="student"
+                              className="accent-blue-600"
+                              value={s.student_id || s._id}
+                              checked={selectedStudentId === (s.student_id || s._id)}
+                              onChange={() => setSelectedStudentId(s.student_id || s._id)}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{full}</div>
+                              <div className="text-xs text-gray-500">
+                                {s.student_phone || "—"} · ID: {s.student_id || s._id}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <div className="px-3 py-6 text-center text-gray-500">
+                        Mos o'quvchilar topilmadi
+                      </div>
+                    )}
+                  </div>
+
+                  {studentModalError && <div className="mt-3 text-sm text-red-600">{studentModalError}</div>}
+
+                  <div className="flex justify-end gap-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setStudentModalOpen(false)}
+                      className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    >
+                      Bekor qilish
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={studentSaving}
+                      className="px-6 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                      <UserPlus size={16} />
+                      {studentSaving ? "Qo'shilmoqda..." : "Biriktirish"}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={createAndAttach}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                      name="surname"
+                      placeholder="Familiya *"
+                      value={createStudentForm.surname}
+                      onChange={(e) => setCreateStudentForm((p) => ({ ...p, surname: e.target.value }))}
+                      required
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      name="name"
+                      placeholder="Ism *"
+                      value={createStudentForm.name}
+                      onChange={(e) => setCreateStudentForm((p) => ({ ...p, name: e.target.value }))}
+                      required
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      name="student_phone"
+                      placeholder="Telefon (o'quvchi) *"
+                      value={createStudentForm.student_phone}
+                      onChange={(e) => setCreateStudentForm((p) => ({ ...p, student_phone: e.target.value }))}
+                      required
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      name="parents_phone"
+                      placeholder="Telefon (ota-ona)"
+                      value={createStudentForm.parents_phone}
+                      onChange={(e) => setCreateStudentForm((p) => ({ ...p, parents_phone: e.target.value }))}
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      name="birth_date"
+                      type="date"
+                      placeholder="Tug'ilgan sana"
+                      value={createStudentForm.birth_date}
+                      onChange={(e) => setCreateStudentForm((p) => ({ ...p, birth_date: e.target.value }))}
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <select
+                      name="gender"
+                      value={createStudentForm.gender}
+                      onChange={(e) => setCreateStudentForm((p) => ({ ...p, gender: e.target.value }))}
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Jinsi</option>
+                      <option value="male">Erkak</option>
+                      <option value="female">Ayol</option>
+                    </select>
+                  </div>
+
+                  <textarea
+                    name="note"
+                    placeholder="Izoh"
+                    rows={3}
+                    value={createStudentForm.note}
+                    onChange={(e) => setCreateStudentForm((p) => ({ ...p, note: e.target.value }))}
+                    className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mt-4"
+                  />
+
+                  {studentModalError && <div className="mt-3 text-sm text-red-600">{studentModalError}</div>}
+
+                  <div className="flex justify-end gap-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setStudentModalOpen(false)}
+                      className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    >
+                      Bekor qilish
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={studentSaving}
+                      className="px-6 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-60"
+                    >
+                      {studentSaving ? "Saqlanmoqda..." : "Yaratish va biriktirish"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Edit Student Modal */}
+        {editStudentOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
+            <form
+              onSubmit={saveEditStudent}
+              className="bg-white p-6 rounded-xl shadow-xl w-[560px] max-h-[90vh] overflow-y-auto"
+            >
+              <h2 className="text-xl font-semibold mb-4">O'quvchini tahrirlash</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  placeholder="Ism *"
+                  value={editStudentForm.name}
+                  onChange={(e) => setEditStudentForm((p) => ({ ...p, name: e.target.value }))}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <input
+                  placeholder="Familiya *"
+                  value={editStudentForm.surname}
+                  onChange={(e) => setEditStudentForm((p) => ({ ...p, surname: e.target.value }))}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <input
+                  placeholder="Telefon (o'quvchi) *"
+                  value={editStudentForm.student_phone}
+                  onChange={(e) => setEditStudentForm((p) => ({ ...p, student_phone: e.target.value }))}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <input
+                  placeholder="Telefon (ota-ona)"
+                  value={editStudentForm.parents_phone}
+                  onChange={(e) => setEditStudentForm((p) => ({ ...p, parents_phone: e.target.value }))}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="date"
+                  placeholder="Tug'ilgan sana"
+                  value={editStudentForm.birth_date}
+                  onChange={(e) => setEditStudentForm((p) => ({ ...p, birth_date: e.target.value }))}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={editStudentForm.gender}
+                  onChange={(e) => setEditStudentForm((p) => ({ ...p, gender: e.target.value }))}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Jinsi</option>
+                  <option value="male">Erkak</option>
+                  <option value="female">Ayol</option>
+                </select>
+                <select
+                  value={editStudentForm.status}
+                  onChange={(e) => setEditStudentForm((p) => ({ ...p, status: e.target.value }))}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Faol</option>
+                  <option value="inactive">Nofaol</option>
+                  <option value="muzlagan">Muzlagan</option>
+                </select>
+              </div>
+
+              <textarea
+                placeholder="Izoh"
+                rows={3}
+                value={editStudentForm.note}
+                onChange={(e) => setEditStudentForm((p) => ({ ...p, note: e.target.value }))}
+                className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mt-4"
+              />
+
+              {editStudentError && <div className="mt-3 text-sm text-red-600">{editStudentError}</div>}
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setEditStudentOpen(false)}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  disabled={editStudentSaving}
+                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-60"
+                >
+                  {editStudentSaving ? "Saqlanmoqda..." : "Saqlash"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---------- MAIN GROUPS LIST VIEW ----------
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -502,7 +1196,7 @@ export default function Guruhlar() {
           <div className="text-sm text-gray-500">Guruhlar</div>
         </div>
 
-        {/* Modal Create/Edit */}
+        {/* Modal Create/Edit Group */}
         {modalOpen && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
             <form
@@ -520,7 +1214,6 @@ export default function Guruhlar() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* GROUP NAME (read-only auto) */}
                 <input
                   name="name"
                   placeholder="Guruh nomi (avtomatik)"
@@ -529,7 +1222,6 @@ export default function Guruhlar() {
                   className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
                 />
 
-                {/* KURS - input with dropdown */}
                 <div className="relative dropdown-container">
                   <input
                     name="course"
@@ -565,7 +1257,6 @@ export default function Guruhlar() {
                   )}
                 </div>
 
-                {/* MENTOR - input with dropdown */}
                 <div className="relative dropdown-container">
                   <input
                     name="teacher_fullName"
@@ -599,7 +1290,6 @@ export default function Guruhlar() {
                   )}
                 </div>
 
-                {/* BRANCH - input with dropdown */}
                 <div className="relative dropdown-container">
                   <input
                     name="branch"
@@ -635,7 +1325,6 @@ export default function Guruhlar() {
                   )}
                 </div>
 
-                {/* START DATE */}
                 <input
                   name="start_date"
                   type="date"
@@ -645,7 +1334,6 @@ export default function Guruhlar() {
                   className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
-                {/* START TIME */}
                 <input
                   name="start_time"
                   type="time"
@@ -655,7 +1343,6 @@ export default function Guruhlar() {
                   className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
-                {/* END TIME */}
                 <input
                   name="end_time"
                   type="time"
@@ -672,12 +1359,10 @@ export default function Guruhlar() {
                   className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="active">Faol</option>
-                  {/* <option value="completed">Yakunlangan</option> */}
                   <option value="inactive">Nofaol</option>
                 </select>
               </div>
 
-              {/* Days Selection */}
               <div className="grid grid-cols-3 gap-3 mt-3">
                 <label className="flex items-center gap-2 border rounded-lg px-3 py-2">
                   <input
@@ -732,7 +1417,7 @@ export default function Guruhlar() {
         )}
       </div>
 
-      {/* Статистика */}
+      {/* Stats */}
       <div className="p-6">
         <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm">
@@ -800,7 +1485,7 @@ export default function Guruhlar() {
           </div>
         </div>
 
-        {/* Панель действий */}
+        {/* Toolbar */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div className="relative">
@@ -816,7 +1501,7 @@ export default function Guruhlar() {
 
             <button
               onClick={() => setShowFilter((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
             >
               <Filter className="w-4 h-4 text-gray-500" />
               Filter
@@ -825,7 +1510,7 @@ export default function Guruhlar() {
             <div className="relative">
               <button
                 onClick={() => setShowImportExport((v) => !v)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm hover:bg-blue-100"
               >
                 <Download className="w-4 h-4" />
                 Export
@@ -852,14 +1537,14 @@ export default function Guruhlar() {
           <div className="flex items-center gap-3">
             <button
               onClick={loadAll}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
             >
               <RefreshCw className="w-4 h-4" />
               Yangilash
             </button>
             <button
               onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600"
             >
               <Plus className="w-4 h-4" />
               Guruh qo'shish
@@ -867,7 +1552,7 @@ export default function Guruhlar() {
           </div>
         </div>
 
-        {/* Ошибка */}
+        {/* Error */}
         {error && !modalOpen && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 mb-6 rounded-lg flex items-center justify-between">
             <span>{error}</span>
@@ -880,9 +1565,8 @@ export default function Guruhlar() {
           </div>
         )}
 
-        {/* Таблица */}
+        {/* Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Заголовок таблицы */}
           <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
             <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
               <div>#</div>
@@ -896,7 +1580,6 @@ export default function Guruhlar() {
             </div>
           </div>
 
-          {/* Тело таблицы */}
           <div className="divide-y divide-gray-100">
             {loading ? (
               <div className="text-center py-8">
@@ -912,18 +1595,17 @@ export default function Guruhlar() {
                 const key = g.group_id || g._id || g.name || idx;
                 const daysTxt = g.days
                   ? [
-                      g.days.odd_days ? "Toq" : null,
-                      g.days.even_days ? "Juft" : null,
-                      g.days.every_days ? "Har kuni" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")
+                    g.days.odd_days ? "Toq" : null,
+                    g.days.even_days ? "Juft" : null,
+                    g.days.every_days ? "Har kuni" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")
                   : "—";
                 const timeTxt =
                   g.start_time && g.end_time
                     ? `${g.start_time}–${g.end_time}`
                     : g.start_time || g.end_time || "—";
-                // try to display date as YYYY-MM-DD if it's ISO
                 let dateTxt = "—";
                 if (g.start_date) {
                   try {
@@ -941,8 +1623,8 @@ export default function Guruhlar() {
                 return (
                   <div
                     key={key}
-                    className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => goToGroup(g)}
+                    className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-blue-50 transition-colors cursor-pointer"
+                    onClick={() => viewGroupDetails(g)}
                   >
                     <div className="text-gray-700 text-sm">{idx + 1}</div>
 
@@ -961,7 +1643,6 @@ export default function Guruhlar() {
                     <div className="text-gray-700 text-sm">{timeTxt}</div>
                     <div className="text-gray-700 text-sm">{dateTxt}</div>
 
-                    {/* Amallar */}
                     <div className="flex justify-center gap-3 col-span-2">
                       <button
                         onClick={(e) => {

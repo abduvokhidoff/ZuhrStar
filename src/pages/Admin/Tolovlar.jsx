@@ -667,7 +667,6 @@ export default function Tolovlar() {
                       setShowGroupsDropdown(true);
                     }}
                     className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-
                   />
                   {showGroupsDropdown && (
                     <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-44 overflow-y-auto z-10 shadow">

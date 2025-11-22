@@ -3,8 +3,6 @@ import {
   Search,
   Plus,
   Eye,
-  Edit as EditIcon,
-  Trash2,
   Users,
   UserCheck,
   AlertTriangle,
@@ -31,33 +29,14 @@ const Oquvchilar = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudents, setSelectedStudents] = useState(new Set());
   const [showCreate, setShowCreate] = useState(false);
-  const [showUpdate, setShowUpdate] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [showDebtorsOnly, setShowDebtorsOnly] = useState(false);
   const [searchGroup, setSearchGroup] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState("");
   const [showList, setShowList] = useState(false);
 
   const filteredGroups = groups.filter(g =>
     g.name.toLowerCase().includes(searchGroup.toLowerCase())
   );
-
-
-  const [form, setForm] = useState({
-    name: '',
-    surname: '',
-    student_phone: '',
-    parents_phone: '',
-    birth_date: '',
-    gender: '',
-    note: '',
-    group_attached: true,
-    password: '',
-    id: '',
-    group_id: '',
-    student_id: '',
-  });
 
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -82,14 +61,6 @@ const Oquvchilar = () => {
     if (response.status === 401) {
       dispatch(logout());
       navigate('/login');
-    }
-  };
-
-  const safeJson = async (res) => {
-    try {
-      return await res.json();
-    } catch {
-      return null;
     }
   };
 
@@ -199,77 +170,6 @@ const Oquvchilar = () => {
       s.surname?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
       s.student_phone?.includes(searchTerm)
   );
-
-  const handleDelete = async (studentId) => {
-    if (!token) {
-      setError('No authentication token found. Please log in.');
-      dispatch(logout());
-      navigate('/login');
-      return;
-    }
-    try {
-      const response = await fetch(`${API_BASE}/students/${studentId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        authGuard(response);
-        const errorData = await safeJson(response);
-        const errorMessages = {
-          403: 'You do not have permission to access this resource.',
-          500: 'Server error. Please try again later.',
-        };
-        throw new Error(
-          errorData?.message ||
-            errorMessages[response.status] ||
-            'Serverdan xatolik.'
-        );
-      }
-      setStudents((prev) =>
-        prev.filter((s) => s._id !== studentId && s.student_id !== studentId)
-      );
-      setSelectedStudents((prev) => {
-        const ns = new Set(prev);
-        ns.delete(studentId);
-        return ns;
-      });
-    } catch (err) {
-      console.error('Delete error:', err);
-      setError(err.message || "O'quvchi o'chirishda xato");
-    }
-  };
-
-  const handleEdit = (student) => {
-    const sid = student.student_id || '';
-    const idMongo = student._id || '';
-    if (!sid && !idMongo) {
-      setUpdateMessage({ text: 'Invalid student ID', type: 'error' });
-      return;
-    }
-    setForm({
-      name: student.name || '',
-      surname: student.surname || '',
-      student_phone: student.student_phone || '',
-      parents_phone: student.parents_phone || '',
-      birth_date: (student.birth_date || '').slice(0, 10),
-      gender: student.gender || '',
-      note: student.note || '',
-      group_attached:
-        student.group_attached !== undefined ? student.group_attached : true,
-      password: '',
-      id: idMongo,
-      student_id: sid,
-      group_id:
-        student.groups && student.groups.length > 0
-          ? String(student.groups[0])
-          : '',
-    });
-    setUpdateMessage({ text: '', type: '' });
-    setShowUpdate(true);
-  };
 
   const handleMuzlatish = async (id) => {
     if (!token) {
@@ -456,100 +356,6 @@ const Oquvchilar = () => {
     }
   };
 
-  const handleUpdate = async () => {
-    const {
-      student_id,
-      name,
-      surname,
-      student_phone,
-      birth_date,
-      gender,
-      parents_phone,
-      note,
-      password,
-      group_attached,
-      group_id,
-    } = form;
-
-    if (
-      !student_id?.trim() ||
-      !name?.trim() ||
-      !surname?.trim() ||
-      !student_phone?.trim() ||
-      !birth_date?.trim() ||
-      !gender?.trim()
-    ) {
-      setUpdateMessage({
-        text: "Iltimos, barcha majburiy maydonlarni to'ldiring",
-        type: 'error',
-      });
-      return;
-    }
-    const phoneRegex = /^\+998\d{9}$/;
-    if (!phoneRegex.test(student_phone)) {
-      setUpdateMessage({
-        text:
-          "Telefon raqami +998 bilan boshlanib, 9 ta raqamdan iborat bo'lishi kerak",
-        type: 'error',
-      });
-      return;
-    }
-    if (!token) {
-      setUpdateMessage({
-        text: 'Token topilmadi. Iltimos, qayta kiring.',
-        type: 'error',
-      });
-      dispatch(logout());
-      navigate('/login');
-      return;
-    }
-
-    try {
-      const payload = {
-        name: name.trim(),
-        surname: surname.trim(),
-        student_phone: student_phone.trim(),
-        parents_phone: parents_phone?.trim() || undefined,
-        birth_date: birth_date.trim(),
-        gender: gender.trim(),
-        note: note?.trim() || undefined,
-        group_attached: !!group_attached,
-      };
-      if (password?.trim()) payload.password = password.trim();
-      if (group_id) payload.groups = [String(group_id)];
-
-      const response = await fetch(`${API_BASE}/students/${student_id}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        authGuard(response);
-        const serverMsg = await readErrorMessage(response);
-        throw new Error(serverMsg || "Noma'lum xato");
-      }
-
-      setUpdateMessage({
-        text: "O'quvchi muvaffaqiyatli yangilandi!",
-        type: 'success',
-      });
-      setTimeout(() => {
-        setShowUpdate(false);
-        setUpdateMessage({ text: '', type: '' });
-      }, 800);
-      fetchStudents();
-    } catch (err) {
-      setUpdateMessage({
-        text: err.message || 'Yangilashda xatolik yuz berdi',
-        type: 'error',
-      });
-    }
-  };
-
   const handleViewDetails = (student) => {
     const anyId = student._id || student.student_id;
     if (!anyId) {
@@ -685,7 +491,6 @@ const Oquvchilar = () => {
               </select>
 
               <div className="relative w-full mb-3">
-                {/* INPUT */}
                 <input
                   type="text"
                   placeholder="Guruhni tanlang (ixtiyoriy)"
@@ -704,7 +509,6 @@ const Oquvchilar = () => {
                   className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
-                {/* LIST */}
                 {showList && (
                   <ul className="absolute w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg z-50">
                     {filteredGroups.length === 0 ? (
@@ -730,7 +534,6 @@ const Oquvchilar = () => {
                   </ul>
                 )}
               </div>
-
 
               <input
                 type="text"
@@ -788,129 +591,6 @@ const Oquvchilar = () => {
                 </button>
                 <button
                   onClick={handleCreate}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  Saqlash
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* UPDATE MODAL */}
-        {showUpdate && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
-            <div className="bg-white p-6 rounded-xl shadow-xl w-96 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4">
-                O'quvchi ma'lumotlarini yangilash
-              </h2>
-              {updateMessage.text && (
-                <div
-                  className={`mb-4 p-3 rounded-lg text-sm ${
-                    updateMessage.type === 'error'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
-                  }`}
-                >
-                  {updateMessage.text}
-                </div>
-              )}
-              <input
-                type="text"
-                placeholder="Ism *"
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="Familiya *"
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.surname}
-                onChange={(e) => setForm({ ...form, surname: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="Telefon raqami (+998xxxxxxxxx) *"
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.student_phone}
-                onChange={(e) =>
-                  setForm({ ...form, student_phone: e.target.value })
-                }
-              />
-              <input
-                type="text"
-                placeholder="Ota-ona telefoni (ixtiyoriy)"
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.parents_phone}
-                onChange={(e) =>
-                  setForm({ ...form, parents_phone: e.target.value })
-                }
-              />
-              <input
-                type="date"
-                placeholder="Tug'ilgan sana *"
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.birth_date}
-                onChange={(e) =>
-                  setForm({ ...form, birth_date: e.target.value })
-                }
-              />
-
-              <select
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.group_id}
-                onChange={(e) => setForm({ ...form, group_id: e.target.value })}
-              >
-                <option value="">Guruhni tanlang (ixtiyoriy)</option>
-                {groups.map((group) => (
-                  <option key={group._id || group.group_id} value={group.group_id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-
-              <input
-                type="text"
-                placeholder="Eslatma (ixtiyoriy)"
-                className="w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.note}
-                onChange={(e) => setForm({ ...form, note: e.target.value })}
-              />
-              <input
-                type="password"
-                placeholder="Yangi parol (ixtiyoriy)"
-                className="w-full border border-gray-300 p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-              />
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setForm({
-                      name: '',
-                      surname: '',
-                      student_phone: '',
-                      parents_phone: '',
-                      birth_date: '',
-                      gender: '',
-                      note: '',
-                      group_attached: true,
-                      password: '',
-                      id: '',
-                      student_id: '',
-                      group_id: '',
-                    });
-                    setShowUpdate(false);
-                    setUpdateMessage({ text: '', type: '' });
-                  }}
-                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  onClick={handleUpdate}
                   className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                 >
                   Saqlash
@@ -1241,23 +921,7 @@ const Oquvchilar = () => {
                         title="Ko'rish"
                         disabled={(student.status || '').toLowerCase() === 'muzlagan'}
                       >
-                        <Eye className="w-10 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(student)}
-                        className="w-10 h-10 bg-orange-500 text-white rounded-md hover:bg-orange-600 flex items-center justify-center transition-colors"
-                        title="Tahrirlash"
-                        disabled={(student.status || '').toLowerCase() === 'muzlagan'}
-                      >
-                        <EditIcon className="w-10 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(student.student_id)}
-                        className="w-10 h-10 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center transition-colors"
-                        title="O'chirish"
-                        disabled={(student.status || '').toLowerCase() === 'muzlagan'}
-                      >
-                        <Trash2 className="w-10 h-5" />
+                        <Eye className="w-5 h-5" />
                       </button>
                       {(student.status || '').toLowerCase() === 'muzlagan' ? (
                         <button
@@ -1265,7 +929,7 @@ const Oquvchilar = () => {
                           className="w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
                           title="Aktivlashtirish"
                         >
-                          <Unlock className="w-10 h-5" />
+                          <Unlock className="w-5 h-5" />
                         </button>
                       ) : (
                         <button
@@ -1273,7 +937,7 @@ const Oquvchilar = () => {
                           className="w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors"
                           title="Muzlatish"
                         >
-                          <Snowflake className="w-10 h-5" />
+                          <Snowflake className="w-5 h-5" />
                         </button>
                       )}
                     </div>

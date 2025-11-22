@@ -2,8 +2,9 @@
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { setCredentials } from "../../redux/authSlice";
-import { Plus, Filter, Pencil, Trash2, Users, Search, RefreshCw } from "lucide-react";
+import { Filter, Search, RefreshCw, Users, ArrowLeft, Calendar, Clock, MapPin } from "lucide-react";
 
 const API_BASE =
   import.meta?.env?.VITE_API_URL?.replace(/\/$/, "") ||
@@ -11,6 +12,7 @@ const API_BASE =
 
 export default function Mentorlar() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { accessToken, refreshToken } = useSelector((s) => s.auth);
 
   const [mentors, setMentors] = useState([]);
@@ -18,20 +20,12 @@ export default function Mentorlar() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilter, setShowFilter] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedMentor, setSelectedMentor] = useState(null);
 
-  const [form, setForm] = useState({
-    fullName: "",
-    phone: "",
-    email: "",
-    company: "",
-    position: "",
-    location: "",
-    status: "active",
-  });
+  // Новые состояния для групп
+  const [showGroups, setShowGroups] = useState(false);
+  const [mentorGroups, setMentorGroups] = useState([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [currentMentor, setCurrentMentor] = useState(null);
 
   // --- REFRESH TOKEN ---
   const refreshAccessToken = async () => {
@@ -69,21 +63,65 @@ export default function Mentorlar() {
     try {
       const res = await api.get("/teachers");
       console.log("API Response:", res.data);
-      
+
+      let teachersData = [];
+
       // Handle nested teachers array
       if (res.data && res.data.teachers && Array.isArray(res.data.teachers)) {
-        setMentors(res.data.teachers);
+        teachersData = res.data.teachers;
       } else if (Array.isArray(res.data)) {
-        setMentors(res.data);
-      } else {
-        setMentors([]);
+        teachersData = res.data;
       }
+
+      // Filter only mentors with role "MENTOR"
+      const mentorsOnly = teachersData.filter(
+        (teacher) => teacher.role === "Mentor" || teacher.Role === "Mentor"
+      );
+
+      console.log("Filtered Mentors:", mentorsOnly);
+      setMentors(mentorsOnly);
     } catch (e) {
       console.error("Load error:", e);
       setError("Ma'lumotlarni yuklashda xatolik yuz berdi.");
       setMentors([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --- LOAD MENTOR GROUPS ---
+  const loadMentorGroups = async (mentor) => {
+    setLoadingGroups(true);
+    setError("");
+    setCurrentMentor(mentor);
+    setShowGroups(true);
+
+    try {
+      // Загружаем все группы
+      const res = await api.get("/groups");
+      console.log("Groups Response:", res.data);
+
+      let allGroups = [];
+      if (Array.isArray(res.data)) {
+        allGroups = res.data;
+      } else if (res.data && Array.isArray(res.data.groups)) {
+        allGroups = res.data.groups;
+      }
+
+      // Фильтруем группы по имени преподавателя
+      const mentorFullName = mentor.fullName || mentor.FullName || "";
+      const filteredGroups = allGroups.filter(
+        (group) => group.teacher_fullName === mentorFullName
+      );
+
+      console.log("Filtered Groups for mentor:", filteredGroups);
+      setMentorGroups(filteredGroups);
+    } catch (e) {
+      console.error("Load groups error:", e);
+      setError("Guruhlarni yuklashda xatolik yuz berdi.");
+      setMentorGroups([]);
+    } finally {
+      setLoadingGroups(false);
     }
   };
 
@@ -105,45 +143,192 @@ export default function Mentorlar() {
   // --- STATS ---
   const total = mentors.length;
 
-  // --- FORM HANDLERS ---
-  const openCreate = () => {
-    setForm({
-      fullName: "",
-      phone: "",
-      email: "",
-      company: "",
-      position: "",
-      location: "",
-      status: "active",
+  // --- BACK TO MENTORS LIST ---
+  const backToMentors = () => {
+    setShowGroups(false);
+    setCurrentMentor(null);
+    setMentorGroups([]);
+  };
+
+  // --- FORMAT DAY TYPE ---
+  const formatDayType = (days) => {
+    if (!days) return "—";
+    if (days.every_days) return "Har kuni";
+    if (days.odd_days) return "Toq kunlari";
+    if (days.even_days) return "Juft kunlari";
+    return "—";
+  };
+
+  // --- NAVIGATE TO GROUP ---
+  const goToGroup = (group) => {
+    const id = group._id || group.group_id;
+
+    navigate(`/admin/guruhlar/`, {
+      state: { group },
     });
-    setIsEditing(false);
-    setSelectedMentor(null);
-    setModalOpen(true);
   };
 
-  const onFormChange = (e) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
-  };
 
-  const saveMentor = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-  };
 
-  const deleteMentor = async (mentor) => {
-    if (!window.confirm("Mentorni o'chirishni xohlaysizmi?")) return;
-    try {
-      const id = mentor.teacher_id || mentor._id;
-      await api.delete(`/teachers/${id}`);
-      loadMentors();
-    } catch (err) {
-      console.error(err);
-      setError("O'chirishda xatolik yuz berdi.");
-    }
-  };
+  // --- IF SHOWING GROUPS VIEW ---
+  if (showGroups) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={backToMentors}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" /> Orqaga
+              </button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-800">
+                  {currentMentor?.fullName} - GURUHLARI
+                </h1>
+                <div className="text-sm text-gray-500 mt-1">
+                  {currentMentor?.email || currentMentor?.phone}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-  // --- UI ---
+        {/* Mentor Info Card */}
+        <div className="p-6">
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div className="flex items-center gap-4">
+              <img
+                src={currentMentor?.imgURL || "https://via.placeholder.com/80"}
+                alt={currentMentor?.fullName}
+                className="w-20 h-20 rounded-full object-cover"
+                onError={(e) => {
+                  e.target.src = "https://via.placeholder.com/80";
+                }}
+              />
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  {currentMentor?.fullName}
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Telefon:</span>
+                    <p className="font-medium text-gray-900">{currentMentor?.phone || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Email:</span>
+                    <p className="font-medium text-gray-900">{currentMentor?.email || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Kompaniya:</span>
+                    <p className="font-medium text-gray-900">{currentMentor?.company || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Lavozim:</span>
+                    <p className="font-medium text-gray-900">{currentMentor?.position || "—"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm mb-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="text-3xl font-bold text-gray-800">
+                  {mentorGroups.length}
+                </div>
+                <div className="text-sm text-gray-500 uppercase">JAMI GURUHLAR</div>
+              </div>
+              <Users className="text-blue-500 w-8 h-8" />
+            </div>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Groups List */}
+          {loadingGroups ? (
+            <div className="text-center py-12">
+              <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+              <div className="text-gray-500">Guruhlar yuklanmoqda...</div>
+            </div>
+          ) : mentorGroups.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">Bu mentor hali guruhga biriktirilmagan</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {mentorGroups.map((group, idx) => (
+                <div
+                  key={group._id || idx}
+                  onClick={() => goToGroup(group)}
+                  className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200 cursor-pointer hover:border-blue-300"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">
+                        {group.name || "Guruh nomi"}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {group.course || "Kurs"}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${group.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-700"
+                        }`}
+                    >
+                      {group.status === "active" ? "Faol" : "Nofaol"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <span>{group.branch || "—"}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>
+                        {group.start_time || "—"} - {group.end_time || "—"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <span>{formatDayType(group.days)}</span>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500">O'quvchilar:</span>
+                        <span className="font-semibold text-blue-600">
+                          {group.students?.length || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN MENTORS LIST VIEW ---
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -152,48 +337,6 @@ export default function Mentorlar() {
           <h1 className="text-xl font-semibold text-gray-800">MENTORLAR</h1>
           <div className="text-sm text-gray-500">Mentorlar</div>
         </div>
-
-        {/* Modal */}
-        {modalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
-            <form
-              onSubmit={saveMentor}
-              className="bg-white p-6 rounded-xl shadow-xl w-[600px] max-h-[90vh] overflow-y-auto"
-            >
-              <h2 className="text-xl font-semibold mb-4">
-                {isEditing ? "Mentorni tahrirlash" : "Yangi mentor yaratish"}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {["FullName", "Phone", "Email", "Branch"].map((f) => (
-                  <input
-                    key={f}
-                    name={f}
-                    placeholder={f.charAt(0).toUpperCase() + f.slice(1)}
-                    value={form[f]}
-                    onChange={onFormChange}
-                    className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                ))}
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-60"
-                >
-                  {isEditing ? "Yangilash" : "Yaratish"}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
       </div>
 
       {/* Stats - Full Width */}
@@ -244,12 +387,6 @@ export default function Mentorlar() {
           >
             <RefreshCw className="w-4 h-4" /> Yangilash
           </button>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600"
-          >
-            <Plus className="w-4 h-4" /> Mentor qo'shish
-          </button>
         </div>
       </div>
 
@@ -278,7 +415,8 @@ export default function Mentorlar() {
             filteredMentors.map((m, i) => (
               <div
                 key={m._id || i}
-                className="px-6 py-4 hover:bg-gray-50 transition-colors"
+                onClick={() => loadMentorGroups(m)}
+                className="px-6 py-4 hover:bg-blue-50 transition-colors cursor-pointer"
               >
                 <div className="grid grid-cols-12 gap-4 items-center text-sm">
                   <div className="col-span-1 text-gray-900 font-medium">{i + 1}</div>

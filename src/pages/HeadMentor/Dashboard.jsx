@@ -1,608 +1,637 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
-import {
-	AreaChart,
-	Area,
-	XAxis,
-	YAxis,
-	Tooltip,
-	ResponsiveContainer,
-	BarChart,
-	Bar,
-} from 'recharts'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { FreeMode } from 'swiper/modules'
+import 'swiper/css'
 
-const API = 'https://zuhrstar-production.up.railway.app/api'
+// === Chart.js (react-chartjs-2)
+import {
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	PointElement,
+	LineElement,
+	Tooltip,
+	Legend,
+	Filler,
+} from 'chart.js'
+import { Bar, Line } from 'react-chartjs-2'
+
+ChartJS.register(
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	PointElement,
+	LineElement,
+	Tooltip,
+	Legend,
+	Filler
+)
 
 const Dashboard = () => {
-	const [students, setStudents] = useState([])
+	const user = useSelector(state => state.auth.user)
+	const accessToken = useSelector(state => state.auth.accessToken)
+
+	const [teachers, setTeachers] = useState([])
 	const [groups, setGroups] = useState([])
+	const [students, setStudents] = useState([])
 	const [attendance, setAttendance] = useState([])
-	const [lessons, setLessons] = useState([])
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState(null)
-	const navigate = useNavigate()
+	const [todaysGroups, setTodaysGroups] = useState([])
+	const [positiveAttendance, setPositiveAttendance] = useState(0)
 
-	const { accessToken, user } = useSelector(state => state.auth)
+	// stabilize current date for the whole render
+	const currentDate = useMemo(() => new Date(), [])
 
-	const mentorName = user?.name || user?.username || 'HeadMentor'
-	const role = user?.role || 'HeadMentor'
+	// ---------------- Helpers ----------------
+	const getMonthKey = d => {
+		const dt = d instanceof Date ? d : new Date(d)
+		const y = dt.getFullYear()
+		const m = String(dt.getMonth() + 1).padStart(2, '0')
+		return `${y}-${m}`
+	}
 
+	// nice month label
+	const labelFromKey = key => {
+		const [y, m] = key.split('-')
+		return new Date(Number(y), Number(m) - 1, 1).toLocaleString('uz-UZ', {
+			month: 'long',
+			year: 'numeric',
+		})
+	}
+
+	// ---------------- Attendance % ----------------
 	useEffect(() => {
-		if (!accessToken) {
-			setError('Tizimga kirishingiz kerak')
-			setLoading(false)
-			return
+		if (attendance.length > 0) {
+			const positive = attendance.filter(a => a.status === true)
+			const percentage = (positive.length / attendance.length) * 100
+			setPositiveAttendance(parseFloat(percentage.toFixed(1)))
+		} else {
+			setPositiveAttendance(0)
+		}
+	}, [attendance])
+
+	// ---------------- Today’s groups ----------------
+	useEffect(() => {
+		if (groups.length > 0) {
+			const today = currentDate.getDay()
+			const filtered = []
+			for (const g of groups) {
+				if (!g?.days) continue
+				if (today === 0 && g.days.every_days) filtered.push(g)
+				else if (today % 2 === 1 && (g.days.odd_days || g.days.every_days))
+					filtered.push(g)
+				else if (today % 2 === 0 && (g.days.even_days || g.days.every_days))
+					filtered.push(g)
+			}
+			setTodaysGroups(filtered)
+		} else {
+			setTodaysGroups([])
+		}
+	}, [groups, currentDate])
+
+	// ---------------- Fetch ----------------
+	useEffect(() => {
+		if (!accessToken) return
+
+		const headers = {
+			Authorization: `Bearer ${accessToken}`,
+			'Content-Type': 'application/json',
 		}
 
-		const headers = { Authorization: `Bearer ${accessToken}` }
-
-		const fetchData = async () => {
+		const getJsonSafe = async (res, fallback = null) => {
+			if (!res.ok) return fallback
 			try {
-				const endpoints = ['students', 'groups', 'attendance', 'lessons']
-				const responses = await Promise.all(
-					endpoints.map(e => fetch(`${API}/${e}`, { headers }))
-				)
-
-				responses.forEach((res, i) => {
-					console.log(`Status (${endpoints[i]}):`, res.status)
-				})
-
-				const allOk = responses.every(res => res.ok || res.status === 404)
-				if (!allOk) {
-					throw new Error('API dan maʼlumot olishda xatolik yuz berdi.')
-				}
-
-				const data = await Promise.all(
-					responses.map(async res =>
-						res.status === 404 ? [] : await res.json()
-					)
-				)
-
-				// store ALL students; limits only in render
-				setStudents(Array.isArray(data[0]) ? data[0] : [])
-				setGroups(data[1].reverse())
-				setAttendance(data[2])
-				setLessons(Array.isArray(data[3]) ? data[3] : [])
-				setLoading(false)
-			} catch (err) {
-				console.error('API Error:', err)
-				setError('Xatolik: ' + err.message)
-				setLoading(false)
+				return await res.json()
+			} catch {
+				return fallback
 			}
 		}
 
-		fetchData()
+		const controller = new AbortController()
+
+		;(async () => {
+			try {
+				const [teachersRes, groupsRes, studentsRes, attendanceRes] =
+					await Promise.all([
+						fetch('https://zuhrstar-production.up.railway.app/api/teachers', {
+							headers,
+							signal: controller.signal,
+						}),
+						fetch('https://zuhrstar-production.up.railway.app/api/groups', {
+							headers,
+							signal: controller.signal,
+						}),
+						fetch('https://zuhrstar-production.up.railway.app/api/students', {
+							headers,
+							signal: controller.signal,
+						}),
+						fetch('https://zuhrstar-production.up.railway.app/api/attendance', {
+							headers,
+							signal: controller.signal,
+						}),
+					])
+
+				const teachersData = (await getJsonSafe(teachersRes, {
+					teachers: [],
+				})) || {
+					teachers: [],
+				}
+				const groupsData = (await getJsonSafe(groupsRes, [])) || []
+				const studentsData = (await getJsonSafe(studentsRes, [])) || []
+				const attendanceData = (await getJsonSafe(attendanceRes, [])) || []
+
+				setTeachers(
+					(teachersData?.teachers || []).filter(t => t.role === 'Mentor')
+				)
+				setGroups(
+					Array.isArray(groupsData) ? groupsData : groupsData?.groups || []
+				)
+				setStudents(
+					Array.isArray(studentsData)
+						? studentsData
+						: studentsData?.students || []
+				)
+				setAttendance(
+					Array.isArray(attendanceData)
+						? attendanceData
+						: attendanceData?.attendance || []
+				)
+			} catch (err) {
+				if (err.name !== 'AbortError') {
+					console.error('Fetch error:', err)
+				}
+			}
+		})()
+
+		return () => controller.abort()
 	}, [accessToken])
 
-	const today = new Date()
-	const day = today.getDate()
-	const weekday = today.getDay()
-	const isOdd = day % 2 === 1
-
-	// Synthetic lessons from groups
-	const groupLessons = groups.map((group, index) => {
-		const times = ['09:00', '11:00', '14:00', '16:00']
-		const durations = ['1s', '1.5s', '2s', '1s']
-		return {
-			time: times[index % times.length],
-			duration: durations[index % durations.length],
-			groupId: group._id || `${index + 1}`,
-			groupName: group.name || `Guruh #${index + 1}`,
-			dayType: index % 3, // 0-yakshanba, 1-toq, 2-juft
+	// ---------------- Chart #1: 12 months ----------------
+	const monthlyBuckets = useMemo(() => {
+		const b = {}
+		for (const s of students) {
+			const dateStr =
+				s.createdAt ||
+				s.created_at ||
+				s.registeredAt ||
+				s.registered_at ||
+				s.created_at_date
+			if (!dateStr) continue
+			const key = getMonthKey(dateStr)
+			if (!b[key]) b[key] = 0
+			b[key] += 1
 		}
-	})
+		return b
+	}, [students])
 
-	const filteredLessons = groupLessons.filter(lesson => {
-		if (weekday === 0) return lesson.dayType === 0
-		if (isOdd) return lesson.dayType === 1
-		return lesson.dayType === 2
-	})
-
-	const getEndTime = startTime => {
-		const [h, m] = startTime.split(':').map(Number)
-		return `${(h + 1).toString().padStart(2, '0')}:${m
-			.toString()
-			.padStart(2, '0')}`
-	}
-
-	const attendancePercentage = attendance.length
-		? Math.round(
-				(attendance.filter(a => a.present).length / attendance.length) * 100
-		  )
-		: 0
-
-	const chartData = Array.from({ length: 30 }, (_, i) => {
-		const factor = Math.random() * 0.2 + 0.9
-		return {
-			day: i + 1,
-			students: Math.floor(students.length * factor),
-			groups: Math.floor(groups.length * factor),
-		}
-	})
-
-	const dailyData = chartData.map(item => ({
-		day: item.day,
-		beginners: Math.ceil(item.students * 0.6),
-		advanced: Math.floor(item.students * 0.4),
-	}))
-
-	const CustomTooltipArea = ({ active, payload, label }) => {
-		if (active && payload && payload.length) {
-			return (
-				<div className=' p-3 border rounded-lg shadow-lg'>
-					<p className='text-sm font-medium text-gray-700'>{`Kun ${label}`}</p>
-					{payload.map((entry, index) => (
-						<p key={index} className='text-sm' style={{ color: entry.color }}>
-							{`${entry.name}: ${entry.value}`}
-						</p>
-					))}
-				</div>
-			)
-		}
-		return null
-	}
-
-	const CustomTooltipBar = ({ active, payload, label }) => {
-		if (active && payload && payload.length) {
-			return (
-				<div className=' p-3 border rounded-lg shadow-lg'>
-					<p className='text-sm font-medium text-gray-700'>{`Kun ${label}`}</p>
-					{payload.map((entry, index) => (
-						<p key={index} className='text-sm' style={{ color: entry.color }}>
-							{`${entry.name}: ${entry.value}`}
-						</p>
-					))}
-				</div>
-			)
-		}
-		return null
-	}
-
-	if (loading) {
-		return (
-			<div className='flex items-center justify-center h-screen'>
-				<div className='animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent'></div>
-			</div>
+	const yearMonthKeys = useMemo(() => {
+		const y = currentDate.getFullYear()
+		return Array.from(
+			{ length: 12 },
+			(_, i) => `${y}-${String(i + 1).padStart(2, '0')}`
 		)
-	}
+	}, [currentDate])
 
-	if (error) {
-		return (
-			<div className='bg-gray-50 min-h-screen p-6 flex items-center justify-center'>
-				<div className='text-center'>
-					<p className='text-red-500 text-lg font-semibold mb-2'>
-						Xatolik yuz berdi:
-					</p>
-					<p className='text-gray-600'>{error}</p>
-					<button
-						onClick={() => window.location.reload()}
-						className='mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
-					>
-						Qayta yuklash
+	const monthLabels = useMemo(
+		() => yearMonthKeys.map(k => labelFromKey(k)),
+		[yearMonthKeys]
+	)
+	const monthCounts = useMemo(
+		() => yearMonthKeys.map(k => monthlyBuckets[k] || 0),
+		[yearMonthKeys, monthlyBuckets]
+	)
+
+	// gradient background for students chart
+	const monthsChartRef = useRef(null)
+	const studentsBarData = useMemo(() => {
+		return {
+			labels: monthLabels,
+			datasets: [
+				{
+					label: "Oy bo'yicha qabul qilinganlar",
+					data: monthCounts,
+					backgroundColor: ctx => {
+						const chart = ctx.chart
+						const { ctx: c, chartArea } = chart
+						if (!chartArea) return 'rgba(37,99,235,0.18)'
+						const g = c.createLinearGradient(
+							0,
+							chartArea.top,
+							0,
+							chartArea.bottom
+						)
+						g.addColorStop(0, 'rgba(37,99,235,0.30)') // top
+						g.addColorStop(1, 'rgba(37,99,235,0.08)') // bottom
+						return g
+					},
+					borderColor: 'rgba(37,99,235,1)', // blue
+					borderWidth: 1.5,
+					borderRadius: 8,
+					barThickness: 28,
+				},
+			],
+		}
+	}, [monthLabels, monthCounts])
+
+	const studentsBarOptions = useMemo(
+		() => ({
+			responsive: true,
+			maintainAspectRatio: false,
+			animation: { duration: 0 },
+			interaction: { mode: 'nearest', intersect: false },
+			plugins: {
+				legend: { display: false },
+				tooltip: {
+					backgroundColor: 'rgba(37,99,235,0.9)',
+					titleColor: '#fff',
+					bodyColor: '#fff',
+					callbacks: { label: ctx => ` ${ctx.formattedValue} ta student` },
+				},
+			},
+			scales: {
+				x: {
+					grid: { display: false },
+					ticks: { color: '#4b5563', font: { weight: '600' } },
+				},
+				y: {
+					beginAtZero: true,
+					grid: { color: 'rgba(0,0,0,0.06)' },
+					ticks: { precision: 0, callback: v => `${v} ta` },
+				},
+			},
+		}),
+		[]
+	)
+
+	// ---------------- Chart #2: Mentor rating (unique students) ----------------
+	const mentorStats = useMemo(() => {
+		const map = new Map() // mentorName -> Set(studentId)
+
+		for (const g of groups) {
+			const mentorName =
+				g.teacher_fullName ||
+				g.teacherName ||
+				g.teacher?.fullName ||
+				`${g.teacher?.name ?? ''} ${g.teacher?.surname ?? ''}`.trim()
+
+			if (!mentorName) continue
+
+			if (!map.has(mentorName)) map.set(mentorName, new Set())
+			const set = map.get(mentorName)
+			for (const s of g.students || []) {
+				const sid = s?._id || s?.student_id || s?.id
+				if (sid) set.add(sid)
+			}
+		}
+
+		// ensure mentors with no groups appear with 0
+		for (const t of teachers) {
+			const name = t.fullName || `${t.name || ''} ${t.surname || ''}`.trim()
+			if (name && !map.has(name)) map.set(name, new Set())
+		}
+
+		const rows = Array.from(map.entries()).map(([name, set]) => ({
+			name,
+			count: set.size,
+		}))
+		rows.sort((a, b) => b.count - a.count)
+		return rows
+	}, [groups, teachers])
+
+	const mentorLabels = useMemo(
+		() => mentorStats.map(r => r.name),
+		[mentorStats]
+	)
+	const mentorCounts = useMemo(
+		() => mentorStats.map(r => r.count),
+		[mentorStats]
+	)
+
+	const mentorsChartRef = useRef(null)
+	const mentorBarData = useMemo(() => {
+		return {
+			labels: mentorLabels,
+			datasets: [
+				{
+					label: "Mentor bo'yicha noyob studentlar",
+					data: mentorCounts,
+					backgroundColor: ctx => {
+						const chart = ctx.chart
+						const { ctx: c, chartArea } = chart
+						if (!chartArea) return 'rgba(16,185,129,0.18)'
+						const g = c.createLinearGradient(
+							0,
+							chartArea.top,
+							0,
+							chartArea.bottom
+						)
+						g.addColorStop(0, 'rgba(16,185,129,0.35)') // top
+						g.addColorStop(1, 'rgba(16,185,129,0.10)') // bottom
+						return g
+					},
+					borderColor: 'rgba(16,185,129,1)', // mint
+					borderWidth: 1.5,
+					borderRadius: 10,
+					barThickness: 28,
+				},
+			],
+		}
+	}, [mentorLabels, mentorCounts])
+
+	const mentorBarOptions = useMemo(
+		() => ({
+			responsive: true,
+			maintainAspectRatio: false,
+			animation: { duration: 0 },
+			interaction: { mode: 'nearest', intersect: false },
+			plugins: {
+				legend: { display: false },
+				tooltip: {
+					backgroundColor: 'rgba(16,185,129,0.9)',
+					titleColor: '#fff',
+					bodyColor: '#fff',
+					callbacks: {
+						title: items => `Mentor: ${items[0].label}`,
+						label: ctx => ` ${ctx.formattedValue} ta noyob student`,
+					},
+				},
+			},
+			scales: {
+				x: {
+					grid: { color: 'rgba(0,0,0,0.08)' }, // different from chart #1
+					ticks: { color: '#111827', font: { weight: '600' } },
+				},
+				y: {
+					beginAtZero: true,
+					grid: { color: 'rgba(0,0,0,0.06)' },
+					ticks: { precision: 0, callback: v => `${v} ta` },
+				},
+			},
+		}),
+		[]
+	)
+
+	return (
+		<div className='flex flex-col gap-[40px] px-[30px] py-[20px] w-full flex-1 relative z-0'>
+			{/* Header */}
+			<div className='flex justify-between items-end'>
+				<div>
+					<p>Xush Kelibsiz {user?.fullName}</p>
+					<h1 className='font-[Nunito Sans] font-[700] leading-[42px] text-[40px] text-[black]'>
+						Boshqaruv paneli
+					</h1>
+				</div>
+				<div>
+					<button className='bg-[#d8eaff] px-[10px] py-[5px] rounded-[8px]'>
+						<p className='font-[Nunito Sans] font-[500] text-[16px] text-[#2563eb]'>
+							{currentDate.getDate()}-
+							{currentDate.toLocaleString('uz-UZ', {
+								month: 'long',
+								year: 'numeric',
+							})}
+						</p>
 					</button>
 				</div>
 			</div>
-		)
-	}
 
-	return (
-		<div className=' min-h-screen p-6'>
-			{/* Header */}
-			<div className='flex justify-between items-end mb-12'>
-				<div className='flex flex-col justify-center items-start'>
-					<p className='text-base font-normal text-gray-500'>
-						Xush kelibsiz, {mentorName}!
-					</p>
-					<h1 className='text-4xl font-bold text-gray-900'>Boshqaruv paneli</h1>
-				</div>
-				<p className='py-1.5 px-4 bg-blue-100 rounded-2xl text-blue-800'>
-					{today.toLocaleDateString('uz-UZ', {
-						year: 'numeric',
-						month: 'long',
-						day: 'numeric',
-					})}
-				</p>
-			</div>
-
-			{/* Stats Cards */}
-			<div className='grid grid-cols-4 gap-6 mb-6'>
-				<div className='bg-white w-full p-6 h-36 rounded-lg shadow-sm'>
-					<div className='flex justify-start items-center gap-2'>
-						<div className='w-1.5 h-6 rounded-r bg-purple-600'></div>
-						<p className='text-sm font-medium text-gray-500'>Mentorlar</p>
-					</div>
-					<div className='flex flex-col justify-start items-start pl-3.5 mt-4'>
-						<p className='text-2xl font-bold text-gray-900'>1</p>
-						<p className='text-sm text-green-600'>Siz faol mentor</p>
-					</div>
-				</div>
-
-				<div className='bg-white w-full p-6 h-36 rounded-lg shadow-sm'>
-					<div className='flex justify-start items-center gap-2'>
-						<div className='w-1.5 h-6 rounded-r bg-teal-600'></div>
-						<p className='text-sm font-medium text-gray-500'>O'quvchilar</p>
-					</div>
-					<div className='flex flex-col justify-start items-start pl-3.5 mt-4'>
-						<p className='text-2xl font-bold text-gray-900'>
-							{students.length}
-						</p>
-						<p className='text-sm text-blue-600'>Jami o'quvchilar</p>
-					</div>
-				</div>
-
-				<div className='bg-white w-full p-6 h-36 rounded-lg shadow-sm'>
-					<div className='flex justify-start items-center gap-2'>
-						<div className='w-1.5 h-6 rounded-r bg-violet-500'></div>
-						<p className='text-sm font-medium text-gray-500'>Guruhlar</p>
-					</div>
-					<div className='flex flex-col justify-start items-start pl-3.5 mt-4'>
-						<p className='text-2xl font-bold text-gray-900'>{groups.length}</p>
-						<p className='text-sm text-teal-600'>Faol guruhlar</p>
-					</div>
-				</div>
-
-				<div className='bg-white w-full p-6 h-36 rounded-lg shadow-sm'>
-					<div className='flex justify-start items-center gap-2'>
-						<div className='w-1.5 h-6 rounded-r bg-amber-500'></div>
-						<p className='text-sm font-medium text-gray-500'>Davomat</p>
-					</div>
-					<div className='flex flex-col justify-start items-start pl-3.5 mt-4'>
-						<p className='text-2xl font-bold text-gray-900'>
-							{attendancePercentage}%
-						</p>
-						<p className='text-sm text-teal-500'>Umumiy davomat</p>
-					</div>
-				</div>
-			</div>
-
-			{/* Today's Lessons Card */}
-			<div className='bg-white p-6 rounded-lg shadow-sm mb-6'>
-				<h2 className='text-xl font-semibold text-gray-700 mb-6'>
-					Bugungi darslar
-				</h2>
-				<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
-					{filteredLessons.length > 0 ? (
-						filteredLessons.map((lesson, i) => {
-							const endTime = getEndTime(lesson.time)
-							return (
-								<div
-									key={i}
-									className='bg-blue-50 p-4 border-l-4 border-blue-500 rounded'
-								>
-									<p className='text-blue-800 font-medium'>
-										{lesson.time} - {endTime}
-									</p>
-									<p className='text-blue-600 text-sm mt-1'>
-										{lesson.groupName}
-									</p>
-									<p className='text-blue-400 text-xs mt-1'>
-										{lesson.dayType === 0
-											? 'Yakshanba'
-											: lesson.dayType === 1
-											? 'Toq kun'
-											: 'Juft kun'}
-									</p>
-								</div>
-							)
-						})
-					) : (
-						<div className='col-span-4 text-gray-500 text-center py-8'>
-							Bugun dars yo'q
+			{/* Stats */}
+			<div className='flex flex-col gap-[30px]'>
+				<div className='flex items-center justify-between gap-[20px]'>
+					{/* Mentorlar */}
+					<div className='flex flex-col gap-[10px] rounded-[8px] bg-[white] shadow-md px-[20px] py-[20px] w-[23%]'>
+						<div className='flex items-center gap-[5px]'>
+							<div className='bg-[#0096a5] w-[6px] h-[25px] rounded-r-[4px]'></div>
+							<p className='font-[Nunito Sans] font-[600] text-[18px] text-black/80'>
+								Mentorlar
+							</p>
 						</div>
+						<div className='px-[11px]'>
+							<p className='font-[Nunito Sans] font-[700] text-[30px] text-[black]'>
+								{teachers.length}
+							</p>
+						</div>
+					</div>
+
+					{/* O'quvchilar */}
+					<div className='flex flex-col gap-[10px] rounded-[8px] bg-[white] shadow-md px-[20px] py-[20px] w-[23%]'>
+						<div className='flex items-center gap-[5px]'>
+							<div className='bg-[#0096a5] w-[6px] h-[25px] rounded-r-[4px]'></div>
+							<p className='font-[Nunito Sans] font-[600] text-[18px] text-black/80'>
+								O&apos;quvchilar
+							</p>
+						</div>
+						<div className='px-[11px]'>
+							<p className='font-[Nunito Sans] font-[700] text-[30px] text-[black]'>
+								{students.length}
+							</p>
+						</div>
+					</div>
+
+					{/* Guruhlar */}
+					<div className='flex flex-col gap-[10px] rounded-[8px] bg-[white] shadow-md px-[20px] py-[20px] w-[23%]'>
+						<div className='flex items-center gap-[5px]'>
+							<div className='bg-[#0096a5] w-[6px] h-[25px] rounded-r-[4px]'></div>
+							<p className='font-[Nunito Sans] font-[600] text-[18px] text-black/80'>
+								Guruhlar
+							</p>
+						</div>
+						<div className='px-[11px]'>
+							<p className='font-[Nunito Sans] font-[700] text-[30px] text-[black]'>
+								{groups.length}
+							</p>
+						</div>
+					</div>
+
+					{/* Davomat */}
+					<div className='flex flex-col gap-[10px] rounded-[8px] bg-[white] shadow-md px-[20px] py-[20px] w-[23%]'>
+						<div className='flex items-center gap-[5px]'>
+							<div className='bg-[#0096a5] w-[6px] h-[25px] rounded-r-[4px]'></div>
+							<p className='font-[Nunito Sans] font-[600] text-[18px] text-black/80'>
+								Davomat
+							</p>
+						</div>
+						<div className='px-[11px]'>
+							<p className='font-[Nunito Sans] font-[700] text-[30px] text-[black]'>
+								{positiveAttendance}%
+							</p>
+						</div>
+					</div>
+				</div>
+
+				{/* Bugungi darslar */}
+				<div className='bg-[white] shadow-md py-[20px] rounded-[8px] flex flex-col gap-[30px] px-[20px] overflow-visible'>
+					<div>
+						<h2 className='font-[Nunito Sans] font-[600] text-[22px] text-[black]'>
+							Bugungi darslar
+						</h2>
+					</div>
+					{todaysGroups.length > 0 ? (
+						<Swiper
+							modules={[FreeMode]}
+							spaceBetween={16}
+							slidesPerView={4}
+							className='w-full'
+							allowTouchMove={false} // prevent drag hijacking clicks
+						>
+							{todaysGroups.map((g, i) => (
+								<SwiperSlide key={i} className='!w-[24%]'>
+									<div className='rounded-[8px] border-l-[5px] border-l-[#0096a5] px-[20px] py-[10px] bg-[#eef6ff]'>
+										<h3>
+											{g.start_time} - {g.end_time}
+										</h3>
+										<p>{g.name}</p>
+									</div>
+								</SwiperSlide>
+							))}
+						</Swiper>
+					) : (
+						<p className='font-[Nunito Sans] font-[500] text-[16px] text-[#555]'>
+							Bugun darslar yo&apos;q
+						</p>
 					)}
 				</div>
-			</div>
 
-			{/* Area Chart - Students Performance */}
-			<div className='bg-white p-6 rounded-lg shadow-sm mb-6'>
-				<div className='flex items-center justify-between mb-6'>
-					<h2 className='text-xl font-semibold text-gray-700'>
-						O'quvchilar natijalari
-					</h2>
-					<div className='flex items-center gap-6'>
-						<div className='flex items-center gap-2'>
-							<div className='w-3 h-3 rounded-full bg-blue-500'></div>
-							<span className='text-sm text-gray-600'>O'quvchilar</span>
-						</div>
-						<div className='flex items-center gap-2'>
-							<div className='w-3 h-3 rounded-full bg-teal-400'></div>
-							<span className='text-sm text-gray-600'>Guruhlar</span>
-						</div>
+				{/* Chart #1: Months */}
+				<div className='bg-white shadow-md rounded-[8px] p-[20px] overflow-visible'>
+					<div className='flex items-center justify-between mb-[12px]'>
+						<h3 className='font-[Nunito Sans] font-[600] text-[22px] text-[black]'>
+							Oylar bo‘yicha qabul qilingan studentlar
+						</h3>
+						<span className='text-[13px] text-black/60'>
+							Joriy yil: <b>{currentDate.getFullYear()}</b>
+						</span>
+					</div>
+					<div className='h-[280px] md:h-[320px]'>
+						<Bar
+							ref={monthsChartRef}
+							data={studentsBarData}
+							options={studentsBarOptions}
+						/>
 					</div>
 				</div>
 
-				<div className='h-96'>
-					<ResponsiveContainer width='100%' height='100%'>
-						<AreaChart
-							data={chartData}
-							margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
-						>
-							<defs>
-								<linearGradient id='colorStudents' x1='0' y1='0' x2='0' y2='1'>
-									<stop offset='5%' stopColor='#3B82F6' stopOpacity={0.4} />
-									<stop offset='95%' stopColor='#3B82F6' stopOpacity={0.1} />
-								</linearGradient>
-								<linearGradient id='colorGroups' x1='0' y1='0' x2='0' y2='1'>
-									<stop offset='5%' stopColor='#2DD4BF' stopOpacity={0.4} />
-									<stop offset='95%' stopColor='#2DD4BF' stopOpacity={0.1} />
-								</linearGradient>
-							</defs>
-
-							<XAxis
-								dataKey='day'
-								axisLine={false}
-								tickLine={false}
-								tick={{ fontSize: 12, fill: '#9CA3AF' }}
-							/>
-
-							<YAxis
-								domain={[0, 'dataMax']}
-								axisLine={false}
-								tickLine={false}
-								tick={{ fontSize: 12, fill: '#9CA3AF' }}
-							/>
-
-							<Tooltip content={<CustomTooltipArea />} />
-
-							<Area
-								type='monotone'
-								dataKey='students'
-								stroke='#3B82F6'
-								strokeWidth={2}
-								fill='url(#colorStudents)'
-								name="O'quvchilar"
-							/>
-
-							<Area
-								type='monotone'
-								dataKey='groups'
-								stroke='#2DD4BF'
-								strokeWidth={2}
-								fill='url(#colorGroups)'
-								name='Guruhlar'
-							/>
-						</AreaChart>
-					</ResponsiveContainer>
-				</div>
-			</div>
-
-			{/* Bar Chart - Student Levels */}
-			<div className='bg-white rounded-lg shadow-sm p-6 mb-8'>
-				<div className='flex justify-between items-center mb-6'>
-					<p className='text-xl font-semibold text-gray-700'>
-						O'quvchilar darajasi
-					</p>
-					<div className='flex items-center gap-4'>
-						<div className='flex items-center gap-2'>
-							<div className='w-3 h-3 rounded-full bg-blue-600'></div>
-							<span className='text-sm text-gray-600'>Boshlang'ich</span>
-						</div>
-						<div className='flex items-center gap-2'>
-							<div className='w-3 h-3 rounded-full bg-orange-400'></div>
-							<span className='text-sm text-gray-600'>Yuqori</span>
-						</div>
+				{/* Chart #2: Mentor rating (Bar, not Line) */}
+				<div className='bg-white shadow-md rounded-[8px] p-[20px] overflow-visible'>
+					<div className='flex items-center justify-between mb-[12px]'>
+						<h3 className='font-[Nunito Sans] font-[600] text-[22px] text-[black]'>
+							Mentorlar reytingi
+						</h3>
+						<span className='text-[13px] text-black/60'>
+							Noyob studentlar soni
+						</span>
 					</div>
-				</div>
-
-				<div className='h-64'>
-					<ResponsiveContainer width='100%' height='100%'>
-						<BarChart
-							data={dailyData}
-							margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-							barCategoryGap='20%'
-						>
-							<XAxis
-								dataKey='day'
-								axisLine={false}
-								tickLine={false}
-								tick={{ fontSize: 12, fill: '#9CA3AF' }}
-								interval={2}
-							/>
-							<YAxis
-								axisLine={false}
-								tickLine={false}
-								tick={{ fontSize: 12, fill: '#9CA3AF' }}
-								tickFormatter={value => {
-									if (value >= 1_000_000)
-										return (value / 1_000_000).toFixed(1) + 'M'
-									if (value >= 1_000) return (value / 1_000).toFixed(0) + 'k'
-									return value.toString()
-								}}
-							/>
-							<Tooltip content={<CustomTooltipBar />} />
-							<Bar
-								dataKey='beginners'
-								fill='#2563EB'
-								name="Boshlang'ich"
-								radius={[2, 2, 0, 0]}
-								maxBarSize={15}
-							/>
-							<Bar
-								dataKey='advanced'
-								fill='#FB923C'
-								name='Yuqori'
-								radius={[2, 2, 0, 0]}
-								maxBarSize={15}
-							/>
-						</BarChart>
-					</ResponsiveContainer>
-				</div>
-			</div>
-
-			{/* Students and Groups Section */}
-			<div className='flex justify-between gap-8 mb-8'>
-				{/* Students List */}
-				<div className='bg-white h-auto w-3/5 rounded-3xl p-8'>
-					<div className='flex justify-between items-center mb-6'>
-						<p className='text-2xl font-bold'>O'quvchilar</p>
-						<button
-							onClick={() => navigate("/head-mentor/o'quvchilar")}
-							className='text-base font-semibold text-blue-500'
-						>
-							Barchasini ko'rish &gt;
-						</button>
+					<div className='h-[280px] md:h-[320px]'>
+						<Line
+							ref={mentorsChartRef}
+							data={mentorBarData}
+							options={mentorBarOptions}
+						/>
 					</div>
-					<div className='flex items-center justify-between'>
-						{students.slice(0, 3).map((student, index) => (
-							<div
-								key={index}
-								className='bg-blue-50 px-8 rounded-3xl py-4 flex justify-center text-center items-center flex-col w-44 h-44'
+
+					{/* Badge list */}
+					<div className='mt-[14px] flex flex-wrap gap-[10px]'>
+						{mentorStats.map(r => (
+							<span
+								key={r.name}
+								className='text-[13px] bg-[#eef6ff] px-[10px] py-[6px] rounded-[6px]'
 							>
-								<div className='w-12 h-12 bg-blue-500 rounded-full mb-4 flex items-center justify-center text-white font-bold'>
-									{student.name ? student.name.charAt(0).toUpperCase() : 'O'}
-								</div>
-								<p className='mb-1 text-base font-bold'>
-									{student.name || "O'quvchi"}
-								</p>
-								<p className='mb-2 text-sm text-gray-600'>
-									{student.level || "Boshlang'ich"}
-								</p>
-								<p className='px-2 h-5 flex justify-center items-center text-xs py-1 border border-gray-400 text-gray-600 rounded'>
-									{student.group || 'Guruh'}
-								</p>
-							</div>
+								{r.name}: <b>{r.count}</b> ta
+							</span>
 						))}
 					</div>
 				</div>
 
-				{/* Groups/Lessons Section */}
-				<div className='w-2/5 h-auto rounded-3xl bg-white p-8'>
-					<div className='flex justify-between items-center mb-6'>
-						<p className='text-2xl font-bold'>Darslar</p>
-						<button
-							onClick={() => navigate('/head-mentor/jadval')}
-							className='text-base font-semibold text-blue-500'
-						>
-							Barchasini ko'rish &gt;
-						</button>
-					</div>
-					<div className='flex flex-col gap-8'>
-						{filteredLessons.slice(0, 3).map((lesson, index) => (
+				{/* Groups list */}
+				<div>
+					<h2 className='text-2xl font-bold text-gray-900 mt-10 ml-2 mb-8'>
+						Guruhlar statistikasi
+					</h2>
+					<div className='flex flex-col gap-6'>
+						{groups.map((group, index) => (
 							<div
-								key={index}
-								className='py-2 h-26 border-l-4 pl-5 rounded border-blue-500'
+								key={group?._id ?? index}
+								className='w-full bg-white rounded-3xl p-8'
 							>
-								<div className='flex justify-between items-start'>
-									<p className='font-medium'>{lesson.groupName} darsi</p>
-									<svg
-										className='w-4 h-4 text-blue-500'
-										fill='currentColor'
-										viewBox='0 0 20 20'
-									>
-										<path
-											fillRule='evenodd'
-											d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'
-											clipRule='evenodd'
-										/>
-									</svg>
-								</div>
-								<div className='flex mt-2 justify-between items-center'>
-									<p className='text-sm text-gray-600'>Bugun | {lesson.time}</p>
-									<div className='flex justify-center items-center gap-1.5 px-2 py-1.5 bg-blue-50 rounded-lg text-gray-600 text-sm font-bold'>
-										<svg
-											className='w-3 h-3'
-											fill='currentColor'
-											viewBox='0 0 20 20'
-										>
-											<path
-												fillRule='evenodd'
-												d='M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
-												clipRule='evenodd'
-											/>
-										</svg>
-										<p>{lesson.duration}</p>
+								<div className='grid grid-cols-1 md:grid-cols-2 gap-12'>
+									{/* Left Side - Group Info */}
+									<div className='flex flex-col gap-6'>
+										<div className='flex items-center gap-7'>
+											<div className='w-12 bg-blue-800 rounded-lg h-12 flex items-center justify-center text-white font-bold'>
+												G{index + 1}
+											</div>
+											<div className='flex flex-col gap-1'>
+												<p className='text-gray-400 text-sm font-normal'>
+													{group._id
+														? group._id.slice(-6).toUpperCase()
+														: `GR000${index + 1}`}
+												</p>
+												<p className='text-lg font-bold'>
+													{group.name || `Guruh ${index + 1}`}
+												</p>
+											</div>
+										</div>
+										<div className='flex gap-8 items-center'>
+											<p className='text-sm font-semibold'>
+												Yaratilgan:{' '}
+												{group.createdAt
+													? new Date(group.createdAt).toLocaleDateString(
+															'uz-UZ'
+													  )
+													: 'Sep 12, 2020'}
+											</p>
+											<p className='text-sm font-bold text-yellow-500'>
+												{group.level || 'Yuqori'}
+											</p>
+										</div>
+									</div>
+
+									{/* Right Side - Group Statistics */}
+									<div className='flex flex-col gap-4'>
+										<p className='text-base font-bold text-gray-900'>
+											Guruh ma'lumotlari
+										</p>
+										<div className='grid grid-cols-3 gap-8'>
+											<div className='text-center'>
+												<p className='text-sm text-gray-600'>
+													Jami o'quvchilar
+												</p>
+												<p className='text-lg font-bold'>
+													{group.students?.length ||
+														group.totalStudents ||
+														'12'}
+												</p>
+											</div>
+											<div className='text-center'>
+												<p className='text-sm text-gray-600'>Faol</p>
+												<p className='text-lg font-bold'>
+													{group.activeStudents ||
+														(group.students?.length
+															? Math.floor(group.students.length * 0.8)
+															: '10')}
+												</p>
+											</div>
+											<div className='text-center'>
+												<p className='text-sm text-gray-600'>To'xtatilgan</p>
+												<p className='text-lg font-bold'>
+													{group.pausedStudents ||
+														(group.students?.length
+															? Math.floor(group.students.length * 0.2)
+															: '2')}
+												</p>
+											</div>
+										</div>
 									</div>
 								</div>
 							</div>
 						))}
-						{filteredLessons.length === 0 && (
-							<div className='text-center py-8 text-gray-500'>
-								Bugun dars yo'q
+						{groups.length === 0 && (
+							<div className='text-center py-12 text-gray-500'>
+								Hozircha guruhlar mavjud emas
 							</div>
 						)}
 					</div>
 				</div>
-			</div>
-
-			{/* Groups Statistics */}
-			<h2 className='text-2xl font-bold text-gray-900 mt-10 ml-2 mb-8'>
-				Guruhlar statistikasi
-			</h2>
-			<div className='flex flex-col gap-6'>
-				{groups.map((group, index) => (
-					<div key={index} className='w-full bg-white rounded-3xl p-8'>
-						<div className='grid grid-cols-2 gap-12'>
-							{/* Left Side - Group Info */}
-							<div className='flex flex-col gap-6'>
-								<div className='flex items-center gap-7'>
-									<div className='w-12 bg-blue-800 rounded-lg h-12 flex items-center justify-center text-white font-bold'>
-										G{index + 1}
-									</div>
-									<div className='flex flex-col gap-1'>
-										<p className='text-gray-400 text-sm font-normal'>
-											{group._id
-												? group._id.slice(-6).toUpperCase()
-												: `GR000${index + 1}`}
-										</p>
-										<p className='text-lg font-bold'>
-											{group.name || `Guruh ${index + 1}`}
-										</p>
-									</div>
-								</div>
-								<div className='flex gap-8 items-center'>
-									<p className='text-sm font-semibold'>
-										Yaratilgan:{' '}
-										{group.createdAt
-											? new Date(group.createdAt).toLocaleDateString('uz-UZ')
-											: 'Sep 12, 2020'}
-									</p>
-									<p className='text-sm font-bold text-yellow-500'>
-										{group.level || 'Yuqori'}
-									</p>
-								</div>
-							</div>
-
-							{/* Right Side - Group Statistics */}
-							<div className='flex flex-col gap-4'>
-								<p className='text-base font-bold text-gray-900'>
-									Guruh ma'lumotlari
-								</p>
-								<div className='grid grid-cols-3 gap-8'>
-									<div className='text-center'>
-										<p className='text-sm text-gray-600'>Jami o'quvchilar</p>
-										<p className='text-lg font-bold'>
-											{group.students?.length || group.totalStudents || '12'}
-										</p>
-									</div>
-									<div className='text-center'>
-										<p className='text-sm text-gray-600'>Faol</p>
-										<p className='text-lg font-bold'>
-											{group.activeStudents ||
-												(group.students?.length
-													? Math.floor(group.students.length * 0.8)
-													: '10')}
-										</p>
-									</div>
-									<div className='text-center'>
-										<p className='text-sm text-gray-600'>To'xtatilgan</p>
-										<p className='text-lg font-bold'>
-											{group.pausedStudents ||
-												(group.students?.length
-													? Math.floor(group.students.length * 0.2)
-													: '2')}
-										</p>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-				))}
-				{groups.length === 0 && (
-					<div className='text-center py-12 text-gray-500'>
-						Hozircha guruhlar mavjud emas
-					</div>
-				)}
 			</div>
 		</div>
 	)

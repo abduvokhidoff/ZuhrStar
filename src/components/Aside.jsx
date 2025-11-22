@@ -11,6 +11,9 @@ import {
 	Video,
 	TestTube,
 	Users,
+	UserRoundPlus,
+	Database,
+	GraduationCap
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import logo from '../assets/logo.png'
@@ -34,7 +37,6 @@ const Aside = () => {
 			{ icon: LayoutGrid, label: 'Dashboard', path: '/mentor/' },
 			{ icon: Layers, label: `O'quvchilar`, path: `/mentor/o'quvchilar` },
 			{ icon: Video, label: `Google Meet`, path: `/mentor/google-meet` },
-			{ icon: Calendar, label: 'Kurslar', path: '/mentor/kurslar' },
 			{ icon: MessagesSquare, label: 'Guruhlar', path: '/mentor/guruhlar' },
 			{ icon: FolderOpen, label: 'Sozlamalar', path: '/mentor/sozlamalar' },
 		],
@@ -44,7 +46,6 @@ const Aside = () => {
 			{ icon: Calendar, label: 'Kurslar', path: `/head-mentor/kurslar` },
 			{ icon: Plane, label: 'Mentorlar', path: '/head-mentor/mentorlar' },
 			{ icon: Calendar, label: 'Jadval', path: '/head-mentor/jadval' },
-			{ icon: TestTube, label: 'Test Javoblar', path: '/head-mentor/test' },
 			{ icon: Layers, label: 'Materiallar', path: '/head-mentor/material' },
 			{
 				icon: MessagesSquare,
@@ -65,15 +66,21 @@ const Aside = () => {
 		admin: [
 			{ icon: LayoutGrid, label: 'Dashboard', path: '/admin/' },
 			{ icon: Layers, label: `O'quvchilar`, path: `/admin/o'quvchilar` },
-			{ icon: Calendar, label: 'Kurslar', path: '/admin/kurslar' },
-			{ icon: Plane, label: 'Mentorlar', path: '/admin/mentorlar' },
+			{ icon: Database, label: 'Kurslar', path: '/admin/kurslar' },
+			{ icon: GraduationCap, label: 'Mentorlar', path: '/admin/mentorlar' },
 			{ icon: UserRound, label: `To'lovlar`, path: `/admin/to'lovlar` },
-			{ icon: MessagesSquare, label: 'Guruhlar', path: '/admin/guruhlar' },
+			{ icon: Users, label: 'Guruhlar', path: '/admin/guruhlar' },
 			{ icon: FolderOpen, label: 'Google Meet', path: '/admin/google-meet' },
 			{
 				icon: FolderOpen,
 				label: 'Bildirishnomalar',
 				path: '/admin/bildirishnomalar',
+			},
+			{
+				icon: UserRoundPlus,
+				label:`Yeg'ilish`,
+				path: `/admin/yeg'ilish`,
+				status: true
 			},
 			// { icon: FolderOpen, label: 'Sozlamalar', path: '/admin/sozlamalar' },
 		],
@@ -98,7 +105,7 @@ const Aside = () => {
 		],
 		supportteacher: [
 			{ icon: LayoutGrid, label: 'Dashboard', path: '/support-mentor/' },
-			{ icon: Layers, label: `Darslar`, path: `/support-mentor/darslar` }
+			{ icon: Layers, label: `Darslar`, path: `/support-mentor/darslar` },
 		],
 	}
 
