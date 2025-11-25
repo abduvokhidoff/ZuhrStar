@@ -96,7 +96,6 @@ const Aside = () => {
 			},
 			{ icon: FolderOpen, label: 'Marketing', path: '/super-admin/marketing' },
 			{ icon: FolderOpen, label: 'Groups', path: '/super-admin/groups' },
-			{ icon: FolderOpen, label: 'Problems', path: '/super-admin/problems' },
 			{
 				icon: FolderOpen,
 				label: 'Sozlamalar',
@@ -105,7 +104,6 @@ const Aside = () => {
 		],
 		supportteacher: [
 			{ icon: LayoutGrid, label: 'Dashboard', path: '/support-mentor/' },
-			{ icon: Layers, label: `Darslar`, path: `/support-mentor/darslar` },
 		],
 	}
 

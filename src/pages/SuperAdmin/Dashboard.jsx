@@ -3,10 +3,11 @@ import { useSelector } from 'react-redux'
 import axios from 'axios'
 import {
 	ResponsiveContainer,
-	AreaChart,
-	Area,
+	LineChart,
+	Line,
 	XAxis,
 	YAxis,
+	CartesianGrid,
 	PieChart,
 	Pie,
 	Cell,
@@ -14,17 +15,15 @@ import {
 	BarChart,
 	Bar,
 } from 'recharts'
-import { NavLink } from 'react-router-dom'
 
 const Dashboard = () => {
-	const [paymentsData, setPaymentsData] = useState([])
 	const [loading, setLoading] = useState({
 		users: true,
 		teachers: true,
 		students: true,
 		groups: true,
 		courses: true,
-		payments: true,
+		checks: true,
 	})
 	const [error, setError] = useState(null)
 	const accessToken = useSelector(state => state.auth.accessToken)
@@ -34,39 +33,8 @@ const Dashboard = () => {
 	const [employee, setEmployee] = useState([])
 	const [teachers, setTeachers] = useState([])
 	const [students, setStudents] = useState([])
-
-	const staticData = [
-		{ day: 1, click: 220000, payme: 180000 },
-		{ day: 2, click: 870000, payme: 940000 },
-		{ day: 3, click: 115000, payme: 125000 },
-		{ day: 4, click: 0, payme: 145000 },
-		{ day: 5, click: 620000, payme: 0 },
-		{ day: 6, click: 330000, payme: 400000 },
-		{ day: 7, click: 980000, payme: 910000 },
-		{ day: 8, click: 1450000, payme: 1350000 },
-		{ day: 9, click: 65000, payme: 59000 },
-		{ day: 10, click: 780000, payme: 760000 },
-		{ day: 11, click: 125000, payme: 111000 },
-		{ day: 12, click: 0, payme: 134000 },
-		{ day: 13, click: 490000, payme: 0 },
-		{ day: 14, click: 720000, payme: 710000 },
-		{ day: 15, click: 880000, payme: 910000 },
-		{ day: 16, click: 1430000, payme: 1380000 },
-		{ day: 17, click: 330000, payme: 290000 },
-		{ day: 18, click: 150000, payme: 170000 },
-		{ day: 19, click: 1150000, payme: 1110000 },
-		{ day: 20, click: 810000, payme: 790000 },
-		{ day: 21, click: 97000, payme: 104000 },
-		{ day: 22, click: 1350000, payme: 1320000 },
-		{ day: 23, click: 420000, payme: 450000 },
-		{ day: 24, click: 570000, payme: 500000 },
-		{ day: 25, click: 380000, payme: 350000 },
-		{ day: 26, click: 1200000, payme: 1180000 },
-		{ day: 27, click: 255000, payme: 300000 },
-		{ day: 28, click: 1480000, payme: 1495000 },
-		{ day: 29, click: 700000, payme: 690000 },
-		{ day: 30, click: 50000, payme: 47000 },
-	]
+	const [checks, setChecks] = useState([])
+	const [studentsMap, setStudentsMap] = useState({})
 
 	const studentRegistrationByMonth = useMemo(() => {
 		const monthCounts = {}
@@ -107,6 +75,68 @@ const Dashboard = () => {
 			{ name: 'Ayol', value: female, color: '#EC4899' },
 		]
 	}, [students])
+
+	// Calculate revenue by month from checks
+	const revenueMonthly = useMemo(() => {
+		const monthlyMap = new Map()
+
+		checks.forEach(check => {
+			const dateStr =
+				check?.date ||
+				check?.createdAt ||
+				check?.paidAt ||
+				check?.updatedAt ||
+				check?.date_Of_Create ||
+				check?.date_of_payment
+			const date = new Date(dateStr)
+
+			if (!isNaN(date.getTime())) {
+				const monthKey = `${date.getFullYear()}-${String(
+					date.getMonth() + 1
+				).padStart(2, '0')}`
+				const amount = Number(check?.amount || check?.sum || check?.total || 0)
+				monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + amount)
+			}
+		})
+
+		return Array.from(monthlyMap.entries())
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([month, revenue]) => ({ month, revenue }))
+	}, [checks])
+
+	// Calculate total revenue
+	const totalRevenue = useMemo(() => {
+		const successfulChecks = checks.filter(check => {
+			const status = String(check?.status || '').toLowerCase()
+			return (
+				!status ||
+				['paid', 'success', 'tasdiqlandi', 'tolagan'].includes(status)
+			)
+		})
+
+		return successfulChecks.reduce((sum, check) => {
+			return sum + Number(check?.amount || check?.sum || check?.total || 0)
+		}, 0)
+	}, [checks])
+
+	const formatValue = value => {
+		if (value >= 1000000) {
+			return (value / 1000000).toFixed(1) + 'M'
+		}
+		if (value >= 1000) {
+			return (value / 1000).toFixed(0) + 'k'
+		}
+		return value.toString()
+	}
+
+	const money = v => {
+		try {
+			const num = Number(v) || 0
+			return num.toLocaleString('uz-UZ') + " so'm"
+		} catch {
+			return `${Number(v) || 0} so'm`
+		}
+	}
 
 	useEffect(() => {
 		if (!accessToken) return
@@ -163,23 +193,59 @@ const Dashboard = () => {
 	}, [accessToken])
 
 	useEffect(() => {
-		let mounted = true
-		;(async () => {
+		if (!accessToken) return
+		const controller = new AbortController()
+		const fetchChecks = async () => {
 			try {
-				await new Promise(resolve => setTimeout(resolve, 1000))
-				if (!mounted) return
-				setPaymentsData(staticData)
-				setLoading(prev => ({ ...prev, payments: false }))
+				const res = await axios.get(
+					'https://zuhrstar-production.up.railway.app/api/checks',
+					{
+						headers: { Authorization: `Bearer ${accessToken}` },
+						signal: controller.signal,
+					}
+				)
+				const checksData = Array.isArray(res.data?.checks)
+					? res.data.checks
+					: Array.isArray(res.data)
+					? res.data
+					: []
+				setChecks(checksData)
+
+				// Fetch student details for each check
+				const studentIds = [
+					...new Set(checksData.map(c => c.paid_student_id).filter(Boolean)),
+				]
+				const studentsMapTemp = {}
+
+				await Promise.allSettled(
+					studentIds.map(async studentId => {
+						try {
+							const studentRes = await axios.get(
+								`https://zuhrstar-production.up.railway.app/api/students/${studentId}`,
+								{
+									headers: { Authorization: `Bearer ${accessToken}` },
+									signal: controller.signal,
+								}
+							)
+							studentsMapTemp[studentId] = studentRes.data
+						} catch (err) {
+							console.error(`Failed to fetch student ${studentId}:`, err)
+							studentsMapTemp[studentId] = null
+						}
+					})
+				)
+
+				setStudentsMap(studentsMapTemp)
+				setLoading(prev => ({ ...prev, checks: false }))
 			} catch (err) {
-				if (!mounted) return
-				setError(err.message)
-				setLoading(prev => ({ ...prev, payments: false }))
+				if (axios.isCancel(err)) return
+				console.error('Ошибка при загрузке чеков:', err)
+				setLoading(prev => ({ ...prev, checks: false }))
 			}
-		})()
-		return () => {
-			mounted = false
 		}
-	}, [])
+		fetchChecks()
+		return () => controller.abort()
+	}, [accessToken])
 
 	useEffect(() => {
 		if (!accessToken) return
@@ -244,41 +310,6 @@ const Dashboard = () => {
 			})
 		return () => controller.abort()
 	}, [accessToken])
-
-	const formatValue = value => {
-		if (value >= 1000000) {
-			return (value / 1000000).toFixed(0) + ' 000 000'
-		} else if (value >= 1000) {
-			return Math.floor(value / 1000) + ' 000'
-		}
-		return value.toString()
-	}
-
-	const formatValueShort = value => {
-		if (value >= 1000000) {
-			return (value / 1000000).toFixed(1) + 'M'
-		}
-		if (value >= 1000) {
-			return (value / 1000).toFixed(0) + 'k'
-		}
-		return value.toString()
-	}
-
-	const CustomTooltipArea = ({ active, payload, label }) => {
-		if (active && payload && payload.length) {
-			return (
-				<div className='bg-white p-3 border border-gray-200 rounded-lg shadow-lg'>
-					<p className='text-sm font-medium text-gray-700'>{`Day ${label}`}</p>
-					{payload.map((entry, index) => (
-						<p key={index} className='text-sm' style={{ color: entry.color }}>
-							{`${entry.name}: ${formatValue(entry.value)} so'm`}
-						</p>
-					))}
-				</div>
-			)
-		}
-		return null
-	}
 
 	const combinedEmployees = useMemo(() => {
 		const combined = [...employee]
@@ -369,7 +400,7 @@ const Dashboard = () => {
 
 	if (isLoading) {
 		return (
-			<div className='bg-[#F5F4F6] min-h-screen p-3 sm:p-4 md:p-6'>
+			<div className='min-h-screen p-3 sm:p-4 md:p-6'>
 				<div className='animate-pulse'>
 					<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6'>
 						{[...Array(4)].map((_, i) => (
@@ -389,20 +420,17 @@ const Dashboard = () => {
 	}
 
 	return (
-		<div className='bg-[#F5F4F6] min-h-screen p-3 sm:p-4 md:p-6'>
+		<div className='min-h-screen p-3 sm:p-4 md:p-6'>
 			{/* Header */}
 			<div className='flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-6 sm:mb-8 md:mb-[50px]'>
 				<div className='flex flex-col justify-center items-start'>
 					<p className='text-sm sm:text-[16px] font-[400] text-[#7D8592]'>
-						Welcome back!
+						Qaytganizga xursandmiz!
 					</p>
 					<h1 className='text-2xl sm:text-3xl md:text-[36px] font-[700] text-[#0A1629]'>
-						Dashboard
+						Home
 					</h1>
 				</div>
-				<p className='py-[6px] px-[12px] sm:px-[15px] bg-[#E6EDF5] rounded-[14px] text-xs sm:text-sm whitespace-nowrap'>
-					Nov 16, 2020 - Dec 16, 2020
-				</p>
 			</div>
 
 			{/* Stats Cards */}
@@ -464,72 +492,67 @@ const Dashboard = () => {
 				</div>
 			</div>
 
-			{/* Payments Chart */}
+			{/* Revenue Chart */}
 			<div className='bg-white p-4 sm:p-6 rounded-lg shadow-sm mb-6'>
 				<div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6'>
 					<h2 className='text-lg sm:text-[20px] font-[600] text-gray-700'>
-						To'lovlar
+						Oylik tushum
 					</h2>
-					<div className='flex items-center gap-4 sm:gap-6'>
-						<div className='flex items-center gap-2'>
-							<div className='w-3 h-3 rounded-full bg-blue-500'></div>
-							<span className='text-xs sm:text-sm text-gray-600'>CLICK</span>
-						</div>
-						<div className='flex items-center gap-2'>
-							<div className='w-3 h-3 rounded-full bg-teal-400'></div>
-							<span className='text-xs sm:text-sm text-gray-600'>Payme</span>
-						</div>
-					</div>
+					<span className='inline-flex items-center rounded-full bg-sky-50 border border-sky-200 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-sky-800'>
+						<span className='hidden sm:inline'>Jami tushum: </span>
+						<span className='sm:hidden'>Tushum: </span>
+						<b className='ml-1'>{money(totalRevenue)}</b>
+					</span>
 				</div>
 
 				<div className='h-64 sm:h-80 md:h-96'>
-					<ResponsiveContainer width='100%' height='100%'>
-						<AreaChart
-							data={paymentsData}
-							margin={{ top: 10, right: 10, left: -10, bottom: 20 }}
-						>
-							<defs>
-								<linearGradient id='colorClick' x1='0' y1='0' x2='0' y2='1'>
-									<stop offset='5%' stopColor='#3B82F6' stopOpacity={0.4} />
-									<stop offset='95%' stopColor='#3B82F6' stopOpacity={0.1} />
-								</linearGradient>
-								<linearGradient id='colorPayme' x1='0' y1='0' x2='0' y2='1'>
-									<stop offset='5%' stopColor='#2DD4BF' stopOpacity={0.4} />
-									<stop offset='95%' stopColor='#2DD4BF' stopOpacity={0.1} />
-								</linearGradient>
-							</defs>
-							<XAxis
-								dataKey='day'
-								axisLine={false}
-								tickLine={false}
-								tick={{ fontSize: 10, fill: '#9CA3AF' }}
-							/>
-							<YAxis
-								domain={[0, 'dataMax']}
-								tickFormatter={value => formatValueShort(value)}
-								axisLine={false}
-								tickLine={false}
-								tick={{ fontSize: 10, fill: '#9CA3AF' }}
-							/>
-							<RTooltip content={<CustomTooltipArea />} />
-							<Area
-								type='monotone'
-								dataKey='click'
-								stroke='#3B82F6'
-								strokeWidth={2}
-								fill='url(#colorClick)'
-								name='Click'
-							/>
-							<Area
-								type='monotone'
-								dataKey='payme'
-								stroke='#2DD4BF'
-								strokeWidth={2}
-								fill='url(#colorPayme)'
-								name='Payme'
-							/>
-						</AreaChart>
-					</ResponsiveContainer>
+					{revenueMonthly.length === 0 ? (
+						emptyState
+					) : (
+						<ResponsiveContainer width='100%' height='100%'>
+							<LineChart
+								data={revenueMonthly}
+								margin={{ top: 10, right: 10, left: -10, bottom: 20 }}
+							>
+								<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
+								<XAxis
+									dataKey='month'
+									stroke='#6b7280'
+									tick={{ fontSize: window.innerWidth < 640 ? 9 : 12 }}
+								/>
+								<YAxis
+									stroke='#6b7280'
+									tick={{ fontSize: window.innerWidth < 640 ? 9 : 12 }}
+									tickFormatter={value => formatValue(value)}
+								/>
+								<RTooltip
+									formatter={value => money(value)}
+									contentStyle={{
+										backgroundColor: 'rgba(255, 255, 255, 0.98)',
+										border: '1px solid #e5e7eb',
+										borderRadius: '8px',
+										boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+									}}
+								/>
+								<Line
+									type='monotone'
+									dataKey='revenue'
+									stroke='#0EA5E9'
+									strokeWidth={window.innerWidth < 640 ? 3 : 4}
+									dot={{
+										fill: '#0EA5E9',
+										strokeWidth: 2,
+										r: window.innerWidth < 640 ? 3 : 5,
+									}}
+									activeDot={{
+										r: window.innerWidth < 640 ? 5 : 7,
+										stroke: '#0EA5E9',
+										strokeWidth: 2,
+									}}
+								/>
+							</LineChart>
+						</ResponsiveContainer>
+					)}
 				</div>
 			</div>
 
@@ -631,16 +654,17 @@ const Dashboard = () => {
 				</div>
 			</div>
 
-			{/* Employees and Plans */}
+			{/* Employees */}
 			<div className='flex flex-col lg:flex-row justify-between gap-6 items-start mt-8 sm:mt-[46px] mb-6'>
 				<div className='flex-1 bg-white rounded-[24px] p-4 sm:p-6'>
 					<div className='flex justify-between items-center mb-4'>
 						<p className='text-lg sm:text-[22px] font-[700]'>Xodimlar</p>
-						<NavLink to='employees'
+						<a
+							href='/super-admin/employees'
 							className='text-sm sm:text-[16px] font-[600] text-[#3F8CFF] whitespace-nowrap'
 						>
-							View all &gt;
-						</NavLink>
+							Hammasini korish &gt;
+						</a>
 					</div>
 					<div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4'>
 						{combinedEmployees.map((user, index) => (
@@ -663,40 +687,6 @@ const Dashboard = () => {
 								<p className='text-xs sm:text-[13px] text-gray-600 truncate w-full'>
 									{user.role || user.position || "O'qituvchi"}
 								</p>
-							</div>
-						))}
-					</div>
-				</div>
-
-				<div className='w-full lg:w-[340px] rounded-[24px] bg-white p-4 sm:p-6'>
-					<div className='flex justify-between items-center mb-4'>
-						<p className='text-lg sm:text-[22px] font-[700]'>Plans</p>
-						<a
-							href='#'
-							className='text-sm sm:text-[16px] font-[600] text-[#3F8CFF]'
-						>
-							View all &gt;
-						</a>
-					</div>
-					<div className='flex flex-col justify-center items-center gap-3 sm:gap-4'>
-						{[1, 2, 3].map(i => (
-							<div
-								key={i}
-								className='py-[8px] min-h-[80px] sm:min-h-[90px] border-l-[4px] pl-4 sm:pl-[20px] rounded-[2px] border-[#3F8CFF] w-full'
-							>
-								<div className='flex justify-between items-start'>
-									<p className='text-sm sm:text-base'>
-										Presentation of the new department
-									</p>
-								</div>
-								<div className='flex mt-2 sm:mt-[9px] justify-between items-center'>
-									<p className='text-xs sm:text-sm text-gray-600'>
-										Today | 5:00 PM
-									</p>
-									<div className='flex justify-center items-center gap-[6px] px-[9px] py-[6px] bg-[#F4F9FD] rounded-[8px] text-[#7D8592] text-xs sm:text-[14px] font-[700]'>
-										<p>4h</p>
-									</div>
-								</div>
 							</div>
 						))}
 					</div>

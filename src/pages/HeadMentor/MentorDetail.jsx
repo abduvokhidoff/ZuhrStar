@@ -1,325 +1,536 @@
-import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+// MentorDetail.jsx
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
+import { setCredentials } from '../../redux/authSlice' // adjust path if needed
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, Check, X } from 'lucide-react'
+import {
+  Clock,
+  Code,
+  Search,
+  Users,
+  ChevronLeft,
+  Check,
+  X,
+  ChevronDown,
+  Loader2,
+  GraduationCap,
+  User,
+} from 'lucide-react'
 
+const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+
+// ----------------- helpers -----------------
+const gid = g => String(g?.group_id ?? g?.id ?? g?._id ?? '')
+const sid = s => String(s?.student_id ?? s?.studentId ?? s?._id ?? '')
+const attKey = (g, s, dateStr) => `${g}:${s}:${dateStr}`
+
+const niceStudent = s => {
+  const nameParts = [s?.name, s?.surname].filter(Boolean)
+  const name = nameParts.join(' ').trim() || "Noma'lum"
+  return { ...s, name }
+}
+
+// weekdays rules (Mon=1 ... Sun=0)
+const getWeekdayConfig = group => {
+  const days = group?.days || {}
+  return {
+    odd: !!days.odd_days, // Mon Wed Fri
+    even: !!days.even_days, // Tue Thu Sat
+    every: !!days.every_days,
+  }
+}
+
+const isClassDay = (dayOfMonth, group) => {
+  const cfg = getWeekdayConfig(group)
+  if (cfg.every) return true
+  const date = new Date(group.selectedYear, group.selectedMonth, dayOfMonth)
+  const weekday = date.getDay() // 0=Sun ... 6=Sat
+  if (cfg.odd && [1, 3, 5].includes(weekday)) return true // Mon Wed Fri
+  if (cfg.even && [2, 4, 6].includes(weekday)) return true // Tue Thu Sat
+  return false
+}
+
+const daysBadge = g => {
+  const cfg = getWeekdayConfig(g)
+  if (cfg.every) return 'Har kuni'
+  if (cfg.odd) return 'Toq kunlar (Dush, Chorsh, Jum)'
+  if (cfg.even) return 'Juft kunlar (Sesh, Paysh, Shan)'
+  return '—'
+}
+
+const toLocalDateStr = d => {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate()
+  ).padStart(2, '0')}`
+}
+
+// ----------------- component -----------------
 const MentorDetail = () => {
-	const { id } = useParams()
-	const accessToken = useSelector(state => state.auth.accessToken)
-	const navigate = useNavigate()
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const accessToken = useSelector(state => state.auth.accessToken)
+  const refreshToken = useSelector(state => state.auth.refreshToken)
 
-	const [mentor, setMentor] = useState(null)
-	const [groups, setGroups] = useState([])
-	const [selectedGroup, setSelectedGroup] = useState(null)
-	const [attendance, setAttendance] = useState({})
-	const [activeKey, setActiveKey] = useState(null)
+  const [mentor, setMentor] = useState(null)
+  const [groups, setGroups] = useState([])
+  const [selectedGroup, setSelectedGroup] = useState(null)
+  const [students, setStudents] = useState([])
+  const [attendance, setAttendance] = useState({})
+  const [showOptions, setShowOptions] = useState(null)
+  const [isLoading, setIsLoading] = useState({ boot: true, attendance: false })
 
-	const today = new Date()
-	const currentMonth = today.getMonth()
-	const currentYear = today.getFullYear()
-	const currentMonthName = today.toLocaleString('default', { month: 'long' })
+  // === Months (range -3..+3) ===
+  const months = useMemo(() => {
+    const now = new Date()
+    const result = []
+    for (let i = -3; i <= 3; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      result.push({
+        label: d.toLocaleDateString('en-US', { month: 'long', year: '2-digit' }),
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        isCurrent: d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(),
+      })
+    }
+    return result
+  }, [])
 
-	// === Fetch Mentor ===
-	useEffect(() => {
-		fetch(`https://zuhrstar-production.up.railway.app/api/teachers/${id}`, {
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${accessToken}`,
-			},
-		})
-			.then(res => res.json())
-			.then(data => setMentor(data.teacher))
-			.catch(err => console.error('Error fetching mentor:', err))
-	}, [id, accessToken])
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return { month: now.getMonth(), year: now.getFullYear(), label: now.toLocaleDateString('en-US', { month: 'long', year: '2-digit' }), isCurrent: true }
+  })
 
-	// === Fetch Groups ===
-	useEffect(() => {
-		fetch('https://zuhrstar-production.up.railway.app/api/groups', {
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${accessToken}`,
-			},
-		})
-			.then(res => res.json())
-			.then(data => setGroups(data))
-			.catch(err => console.error('Error fetching groups:', err))
-	}, [accessToken])
+  useEffect(() => {
+    const current = months.find(m => m.isCurrent)
+    if (current) setSelectedMonth(current)
+  }, [months])
 
-	// === Filter Groups belonging to Mentor ===
-	const attachedGroups = mentor
-		? groups.filter(g => g.teacher_fullName === mentor.fullName)
-		: []
+  // monthDays local list
+  const monthDays = useMemo(() => {
+    if (!selectedMonth) return []
+    const y = selectedMonth.year
+    const m = selectedMonth.month
+    const daysInMonth = new Date(y, m + 1, 0).getDate()
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1
+      const d = new Date(y, m, day)
+      const isoLocal = toLocalDateStr(d)
+      const now = new Date()
+      const isToday = day === now.getDate() && m === now.getMonth() && y === now.getFullYear()
+      const dateLabel = `${String(day).padStart(2, '0')}.${String(m + 1).padStart(2, '0')}`
+      const dayName = d.toLocaleDateString('uz-UZ', { weekday: 'short' })
+      return { day, date: d, dateStr: isoLocal, isToday, dateLabel, dayName }
+    })
+  }, [selectedMonth])
 
-	// === Generate 12 Lesson Dates ===
-	const generateLessonDates = group => {
-		if (!group) return []
-		const days = []
-		const start = new Date(currentYear, currentMonth, 1)
-		const end = new Date(currentYear, currentMonth + 1, 0)
-		let lessonCount = 0
+  // classDays filtered by group's weekday rules
+  const classDays = useMemo(() => {
+    if (!selectedGroup) return monthDays
+    return monthDays.filter(d =>
+      isClassDay(d.day, {
+        ...selectedGroup,
+        selectedYear: selectedMonth?.year,
+        selectedMonth: selectedMonth?.month,
+      })
+    )
+  }, [monthDays, selectedGroup, selectedMonth])
 
-		for (
-			let d = new Date(start);
-			d <= end && lessonCount < 12;
-			d.setDate(d.getDate() + 1)
-		) {
-			const day = d.getDay()
-			if (
-				group.days.every_days ||
-				(group.days.even_days && [2, 4, 6].includes(day)) ||
-				(group.days.odd_days && [1, 3, 5].includes(day))
-			) {
-				days.push(new Date(d))
-				lessonCount++
-			}
-		}
-		return days
-	}
+  // --- token refresh + authFetch ---
+  const refreshAccessToken = useCallback(async () => {
+    if (!refreshToken) return null
+    try {
+      const res = await fetch(`${API_BASE}/users/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+      if (!res.ok) throw new Error('Token refresh failed')
+      const data = await res.json()
+      dispatch(setCredentials(data))
+      return data.accessToken
+    } catch (err) {
+      console.error('refreshAccessToken error:', err)
+      return null
+    }
+  }, [refreshToken, dispatch])
 
-	const lessonDates = generateLessonDates(selectedGroup)
+  const authFetch = useCallback(
+    async (url, opts = {}) => {
+      const attempt = async token => {
+        const headers = {
+          Authorization: token ? `Bearer ${token}` : undefined,
+          'Content-Type': 'application/json',
+          ...(opts.headers || {}),
+        }
+        const res = await fetch(url, { ...opts, headers })
+        if (res.status === 401) throw new Error('401')
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(text || `HTTP ${res.status}`)
+        }
+        const ct = res.headers.get('content-type') || ''
+        if (ct.includes('application/json')) return await res.json()
+        return null
+      }
 
-	// === Fetch Attendance ===
-	useEffect(() => {
-		if (!selectedGroup) return
+      try {
+        return await attempt(accessToken)
+      } catch (e) {
+        if (String(e.message).includes('401')) {
+          const newToken = await refreshAccessToken()
+          if (!newToken) throw e
+          return await attempt(newToken)
+        }
+        throw e
+      }
+    },
+    [accessToken, refreshAccessToken]
+  )
 
-		fetch('https://zuhrstar-production.up.railway.app/api/attendance', {
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${accessToken}`,
-			},
-		})
-			.then(res => res.json())
-			.then(data => {
-				const filtered = data.filter(
-					a => a.group_id === (selectedGroup.group_id || selectedGroup._id)
-				)
-				const obj = {}
-				filtered.forEach(a => {
-					obj[`${a.student_id}-${a.date}`] = a.status
-				})
-				setAttendance(obj)
-			})
-			.catch(err => console.error('Error fetching attendance:', err))
-	}, [selectedGroup, accessToken])
+  // --- load mentor ---
+  useEffect(() => {
+    if (!accessToken || !id) return
+    const load = async () => {
+      try {
+        const res = await authFetch(`${API_BASE}/teachers/${id}`)
+        // backend may return {teacher: {...}} or teacher object directly
+        const teacher = res?.teacher ?? res
+        setMentor(teacher)
+      } catch (err) {
+        console.error('Error fetching mentor:', err)
+      }
+    }
+    load()
+  }, [id, accessToken, authFetch])
 
-	// === Post Attendance ===
-	const postAttendance = async (studentId, date, status) => {
-		if (!selectedGroup) return
-		const key = `${studentId}-${date}`
-		setAttendance(prev => ({ ...prev, [key]: status }))
-		setActiveKey(null)
+  // --- load groups ---
+  useEffect(() => {
+    if (!accessToken) return
+    const load = async () => {
+      setIsLoading(prev => ({ ...prev, boot: true }))
+      try {
+        const gRes = await authFetch(`${API_BASE}/groups`)
+        const groupList = Array.isArray(gRes) ? gRes : gRes?.groups || []
+        setGroups(groupList)
+      } catch (err) {
+        console.error('Error fetching groups:', err)
+      } finally {
+        setIsLoading(prev => ({ ...prev, boot: false }))
+      }
+    }
+    load()
+  }, [accessToken, authFetch])
 
-		try {
-			await fetch('https://zuhrstar-production.up.railway.app/api/attendance', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`,
-				},
-				body: JSON.stringify({
-					date,
-					group_id: selectedGroup.group_id || selectedGroup._id,
-					student_id: studentId,
-					status,
-				}),
-			})
-		} catch (err) {
-			console.error('Error posting attendance:', err)
-		}
-	}
+  // when select a group -> set students from group
+  const handleGroupClick = group => {
+    setSelectedGroup(group)
+    setStudents((group.students || []).map(niceStudent))
+  }
 
-	if (!mentor) {
-		return (
-			<div className='flex justify-center items-center h-screen'>
-				<p className='text-lg font-semibold'>Loading mentor...</p>
-			</div>
-		)
-	}
+  // --- load attendance for selectedGroup & month ---
+  const loadAttendance = useCallback(async () => {
+    if (!selectedGroup || !selectedMonth) return
+    setIsLoading(prev => ({ ...prev, attendance: true }))
+    try {
+      const startDate = new Date(selectedMonth.year, selectedMonth.month, 1)
+      const endDate = new Date(selectedMonth.year, selectedMonth.month + 1, 0)
+      const start = toLocalDateStr(startDate)
+      const end = toLocalDateStr(endDate)
 
-	return (
-		<div className='flex flex-col gap-8 px-8 py-6'>
-			{/* Header */}
-			<div className='bg-white rounded-2xl w-full py-6 px-6 flex items-center justify-between shadow-sm'>
-				<div className='flex flex-col gap-1'>
-					<h1 className='font-bold text-4xl text-[#0071ca]'>
-						{mentor.fullName}
-					</h1>
-					<p className='text-gray-600'>Guruhlari va davomat</p>
-				</div>
-				<button
-					onClick={() => navigate('/head-mentor/mentorlar')}
-					className='border border-gray-400 rounded-lg px-5 py-2 text-gray-700 hover:bg-gray-800 hover:text-white transition-all'
-				>
-					Ortga
-				</button>
-			</div>
+      const groupParam = selectedGroup.group_id ?? selectedGroup.id ?? gid(selectedGroup)
+      const res = await authFetch(`${API_BASE}/attendance?group_id=${groupParam}&start=${start}&end=${end}`)
+      const data = Array.isArray(res) ? res : res?.attendance || []
 
-			{/* Groups */}
-			<div className='bg-white rounded-2xl py-5 px-6 flex flex-col gap-4 shadow-sm'>
-				<h2 className='text-2xl font-semibold text-[#0071ca]'>Guruhlar</h2>
-				<div className='flex flex-wrap gap-3'>
-					{attachedGroups.length > 0 ? (
-						attachedGroups.map(v => (
-							<button
-								key={v._id}
-								onClick={() => setSelectedGroup(v)}
-								className={`transition-all w-[19%] py-4 rounded-xl flex flex-col items-start px-4 shadow-sm hover:shadow-md ${
-									selectedGroup && selectedGroup._id === v._id
-										? 'bg-blue-100 border-l-[6px] border-blue-600'
-										: 'bg-[#f5f9ff] border-l-[4px] border-[#49a8f1]'
-								}`}
-							>
-								<p className='font-semibold'>
-									{v.start_time} - {v.end_time}
-								</p>
-								<p className='text-gray-600'>{v.name}</p>
-								<p className='text-gray-500 text-sm'>
-									{v.days.every_days
-										? 'Har kuni'
-										: v.days.even_days
-										? 'Juft kunlar'
-										: v.days.odd_days
-										? 'Toq kunlar'
-										: 'Kunlar belgilanmagan'}
-								</p>
-							</button>
-						))
-					) : (
-						<p className='text-gray-500'>Bu mentor uchun guruhlar topilmadi.</p>
-					)}
-				</div>
-			</div>
+      const map = {}
+      data.forEach(r => {
+        let dateStr = r.date || r.dateStr || ''
+        if (dateStr.includes('T')) dateStr = dateStr.split('T')[0]
+        if (!dateStr) return
+        const key = attKey(gid(selectedGroup), sid(r), dateStr)
+        map[key] = r.status === true || r.status === 'present' ? 'present' : 'absent'
+      })
+      setAttendance(map)
+    } catch (err) {
+      console.error('Error loading attendance:', err)
+    } finally {
+      setIsLoading(prev => ({ ...prev, attendance: false }))
+    }
+  }, [selectedGroup, selectedMonth, authFetch])
 
-			{/* Attendance */}
-			<div className='bg-white rounded-2xl py-6 px-6 shadow-sm relative'>
-				<div className='flex items-center justify-between mb-4'>
-					<div>
-						<h3 className='text-2xl font-semibold text-[#0071ca]'>Davomat</h3>
-						<p className='text-gray-600'>
-							{selectedGroup
-								? `Tanlangan guruh: ${selectedGroup.name}`
-								: 'Hech qanday guruh tanlanmadi'}
-						</p>
-					</div>
-					<div className='px-4 py-2 rounded-lg bg-blue-50 text-blue-700 font-medium'>
-						{currentMonthName} {currentYear}
-					</div>
-				</div>
+  useEffect(() => {
+    if (selectedGroup) loadAttendance()
+  }, [selectedGroup, selectedMonth, loadAttendance])
 
-				{selectedGroup ? (
-					<div
-						className='overflow-x-auto relative'
-						style={{ overflow: 'visible' }}
-					>
-						<table className='min-w-full border border-gray-200 rounded-lg overflow-visible relative'>
-							<thead className='bg-blue-50'>
-								<tr>
-									<th className='py-3 px-4 font-semibold text-gray-700 text-left w-[200px]'>
-										O‘quvchi
-									</th>
-									{lessonDates.map((date, idx) => (
-										<th
-											key={idx}
-											className={`py-3 px-4 text-sm text-gray-600 text-center w-[60px] ${
-												date.getDate() === today.getDate()
-													? 'bg-blue-100 font-bold text-blue-700 rounded-t-lg'
-													: ''
-											}`}
-										>
-											{date.getDate()}
-										</th>
-									))}
-								</tr>
-							</thead>
-							<tbody>
-								{selectedGroup.students.map(student => (
-									<tr
-										key={student.student_id}
-										className='border-t hover:bg-gray-50 relative'
-									>
-										<td className='py-3 px-4 font-medium text-gray-800 whitespace-nowrap'>
-											{student.name} {student.surname}
-										</td>
-										{lessonDates.map((date, idx) => {
-											const localDate = new Date(
-												date.getFullYear(),
-												date.getMonth(),
-												date.getDate(),
-												12,
-												0,
-												0
-											)
-											const dateStr = localDate.toISOString()
-											const key = `${student.student_id}-${dateStr}`
-											const status = attendance[key]
+  // --- can mark attendance (time rules) ---
+  const canMarkAttendance = dateStr => {
+    if (!selectedGroup) return { allowed: false, message: 'Guruh tanlanmagan.' }
+    const now = new Date()
+    const parts = dateStr.split('-').map(Number)
+    if (parts.length !== 3) return { allowed: false, message: "Noto'g'ri sana formatı." }
+    const [year, month, day] = parts
+    const selectedDate = new Date(year, month - 1, day)
 
-											return (
-												<td
-													key={idx}
-													className='py-2 px-4 text-center relative'
-													style={{ overflow: 'visible' }}
-												>
-													{status === true ? (
-														<div className='w-6 h-6 bg-green-500 rounded-full mx-auto shadow-sm'></div>
-													) : status === false ? (
-														<div className='w-6 h-6 bg-red-500 rounded-full mx-auto shadow-sm'></div>
-													) : (
-														<div
-															onClick={() =>
-																setActiveKey(activeKey === key ? null : key)
-															}
-															className='relative w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center mx-auto cursor-pointer transition-all'
-															style={{ overflow: 'visible', zIndex: 20 }}
-														>
-															<Plus size={16} className='text-gray-600' />
-															{activeKey === key && (
-																<div
-																	className='absolute bottom-8 left-1/2 -translate-x-1/2 bg-white border rounded-lg shadow-md p-2 flex gap-2'
-																	style={{
-																		zIndex: 9999,
-																		whiteSpace: 'nowrap',
-																	}}
-																>
-																	<Check
-																		size={16}
-																		onClick={() =>
-																			postAttendance(
-																				student.student_id,
-																				dateStr,
-																				true
-																			)
-																		}
-																		className='text-green-500 cursor-pointer hover:scale-110 transition-transform'
-																	/>
-																	<X
-																		size={16}
-																		onClick={() =>
-																			postAttendance(
-																				student.student_id,
-																				dateStr,
-																				false
-																			)
-																		}
-																		className='text-red-500 cursor-pointer hover:scale-110 transition-transform'
-																	/>
-																</div>
-															)}
-														</div>
-													)}
-												</td>
-											)
-										})}
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				) : (
-					<p className='text-gray-500'>Iltimos, avval guruh tanlang.</p>
-				)}
-			</div>
-		</div>
-	)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const selectedStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+
+    todayStart.setHours(0,0,0,0); selectedStart.setHours(0,0,0,0)
+    if (selectedStart.getTime() < todayStart.getTime()) {
+      return { allowed: false, message: "O'tgan kunlar uchun davomat belgilab bo'lmaydi!" }
+    }
+    if (selectedStart.getTime() > todayStart.getTime()) {
+      return { allowed: false, message: "Kelajak kunlar uchun davomat belgilab bo'lmaydi!" }
+    }
+
+    // today => check class time
+    const startTime = selectedGroup?.start_time || '00:00'
+    const endTime = selectedGroup?.end_time || '23:59'
+    const parseTime = t => {
+      const p = String(t).split(':').map(n => Number(n))
+      const h = Number.isFinite(p[0]) ? p[0] : 0
+      const mm = Number.isFinite(p[1]) ? p[1] : 0
+      return { h: Math.max(0, Math.min(23, h)), m: Math.max(0, Math.min(59, mm)) }
+    }
+    const s = parseTime(startTime)
+    const e = parseTime(endTime)
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const classStartMinutes = s.h * 60 + s.m
+    const classEndMinutes = e.h * 60 + e.m
+    const formatTime = t => {
+      const parts = String(t).split(':')
+      const hh = parts[0] ? String(parts[0]).padStart(2, '0') : '00'
+      const mm = parts[1] ? String(parts[1]).padStart(2, '0') : '00'
+      return `${hh}:${mm}`
+    }
+    if (currentMinutes < classStartMinutes) {
+      return { allowed: false, message: `Dars hali boshlanmagan! Dars vaqti: ${formatTime(startTime)} - ${formatTime(endTime)}` }
+    }
+    if (currentMinutes > classEndMinutes) {
+      return { allowed: false, message: `Dars tugagan! Dars vaqti: ${formatTime(startTime)} - ${formatTime(endTime)}` }
+    }
+    return { allowed: true }
+  }
+
+  // --- mark attendance ---
+  const markAttendance = async (studentIdRaw, dateStr, status) => {
+    const timeCheck = canMarkAttendance(dateStr)
+    if (!timeCheck.allowed) {
+      alert(timeCheck.message)
+      return
+    }
+    const studentId = String(studentIdRaw)
+    const key = attKey(gid(selectedGroup), studentId, dateStr)
+    const prev = attendance[key]
+    setAttendance(prevMap => ({ ...prevMap, [key]: status }))
+
+    try {
+      const groupVal = selectedGroup.group_id ?? selectedGroup.id ?? gid(selectedGroup)
+      const groupNumeric = Number(groupVal)
+      const studentNumeric = Number(studentId)
+      const payload = {
+        group_id: !Number.isNaN(groupNumeric) ? groupNumeric : groupVal,
+        student_id: !Number.isNaN(studentNumeric) ? studentNumeric : studentId,
+        groupId: gid(selectedGroup),
+        studentId: studentId,
+        date: dateStr,
+        status: status === 'present',
+      }
+      await authFetch(`${API_BASE}/attendance`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+      setShowOptions(null)
+    } catch (err) {
+      console.error('Error posting attendance:', err)
+      setAttendance(prevMap => ({ ...prevMap, [key]: prev }))
+      let errMsg = err?.message ?? String(err)
+      try {
+        const parsed = JSON.parse(errMsg)
+        if (parsed?.message) errMsg = parsed.message
+      } catch {}
+      alert('Xatolik: ' + errMsg)
+    }
+  }
+
+  const getStatusCls = s =>
+    s === 'present'
+      ? 'bg-[#4ADE80] text-white'
+      : s === 'absent'
+      ? 'bg-[#EF4444] text-white'
+      : 'bg-gray-100 border border-gray-300'
+
+  // ----------------- render -----------------
+  if (isLoading.boot) {
+    return (
+      <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
+        <Loader2 className='w-8 h-8 animate-spin text-[#0066CC]' />
+      </div>
+    )
+  }
+
+  return (
+    <div className='min-h-screen bg-[#F5F7FA] px-6 py-6'>
+      {/* Header */}
+      <div className='bg-white rounded-2xl w-full py-6 px-6 flex items-center justify-between shadow-sm mb-6'>
+        <div className='flex flex-col gap-1'>
+          <h1 className='font-bold text-3xl text-[#0071ca]'>
+            {mentor?.fullName ?? 'Mentor'}
+          </h1>
+          <p className='text-gray-600'>Guruhlari va davomat</p>
+        </div>
+        <div className='flex gap-3 items-center'>
+          <button
+            onClick={() => navigate('/head-mentor/mentorlar')}
+            className='border border-gray-400 rounded-lg px-5 py-2 text-gray-700 hover:bg-gray-800 hover:text-white transition-all'
+          >
+            Ortga
+          </button>
+        </div>
+      </div>
+
+      {/* Groups list (left/top) */}
+      <div className='bg-white rounded-2xl py-5 px-6 flex flex-col gap-4 shadow-sm mb-6'>
+        <h2 className='text-2xl font-semibold text-[#0071ca]'>Guruhlar</h2>
+        <div className='flex flex-wrap gap-3'>
+          {groups
+            .filter(g => g.teacher_fullName === mentor?.fullName)
+            .map(v => (
+              <button
+                key={v._id}
+                onClick={() => handleGroupClick(v)}
+                className={`transition-all w-[19%] py-4 rounded-xl flex flex-col items-start px-4 shadow-sm hover:shadow-md ${
+                  selectedGroup && (selectedGroup._id === v._id)
+                    ? 'bg-blue-100 border-l-[6px] border-blue-600'
+                    : 'bg-[#f5f9ff] border-l-[4px] border-[#49a8f1]'
+                }`}
+              >
+                <p className='font-semibold'>{v.start_time} - {v.end_time}</p>
+                <p className='text-gray-600'>{v.name}</p>
+                <p className='text-gray-500 text-sm'>
+                  {v.days?.every_days
+                    ? 'Har kuni'
+                    : v.days?.even_days
+                    ? 'Juft kunlar'
+                    : v.days?.odd_days
+                    ? 'Toq kunlar'
+                    : 'Kunlar belgilanmagan'}
+                </p>
+              </button>
+            ))}
+        </div>
+      </div>
+
+      {/* If no group selected show message */}
+      {!selectedGroup ? (
+        <div className='bg-white rounded-2xl py-6 px-6 shadow-sm'>
+          <p className='text-gray-500'>Iltimos, avval guruh tanlang.</p>
+        </div>
+      ) : (
+        // Attendance view (Guruhlar-style)
+        <div className='bg-white border border-gray-200 rounded-lg overflow-hidden'>
+
+          {/* Month buttons */}
+          <div className='flex gap-2 p-4 overflow-x-auto border-b'>
+            {months.map((m, i) => (
+              <button
+                key={i}
+                onClick={() => setSelectedMonth(m)}
+                className={`px-5 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                  selectedMonth?.label === m.label ? 'bg-[#0066CC] text-white' : 'bg-white text-gray-700 border border-gray-300'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          {isLoading.attendance ? (
+            <div className='flex items-center justify-center h-64'>
+              <Loader2 className='w-8 h-8 animate-spin text-[#0066CC]' />
+            </div>
+          ) : (
+            <div className='overflow-auto max-h-[60vh]'>
+              <table className='w-full'>
+                <thead className='sticky top-0 z-20 bg-white'>
+                  <tr className='border-b border-gray-200 bg-[#F8FAFC]'>
+                    <th className='sticky left-0 bg-[#F8FAFC] z-30 text-left px-4 py-3 font-semibold text-gray-700 border-r border-gray-200 min-w-[360px]'>
+                      O'quvchilar
+                    </th>
+                    {classDays.map(d => (
+                      <th key={d.dateStr} className='px-2 py-3 text-center min-w-[70px]'>
+                        <div className='text-xs font-semibold text-gray-700'>{d.dateLabel}</div>
+                        <div className='text-[10px] text-gray-500 mt-0.5 uppercase'>{d.dayName}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {students.map((s, i) => {
+                    const student = niceStudent(s)
+                    return (
+                      <tr key={sid(student)} className='border-b border-gray-100 hover:bg-gray-50'>
+                        <td className='sticky left-0 bg-white z-10 px-4 py-3 border-r border-gray-200'>
+                          <div className='flex items-center gap-3'>
+                            <span className='w-[30px] h-[30px] rounded-full bg-[#0066CC] text-white text-sm flex items-center justify-center font-semibold'>
+                              {i + 1}
+                            </span>
+                            <div>
+                              <div className='font-medium text-gray-900'>{student.name}</div>
+                              <div className='text-xs text-gray-500'>{student.student_phone}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {classDays.map(d => {
+                          const key = attKey(gid(selectedGroup), sid(student), d.dateStr)
+                          const status = attendance[key]
+                          return (
+                            <td key={d.dateStr} className='px-2 py-2 text-center relative'>
+                              <button
+                                onClick={() => setShowOptions(showOptions === key ? null : key)}
+                                className={`w-9 h-9 rounded-md flex items-center justify-center mx-auto transition-all ${getStatusCls(status)}`}
+                              >
+                                {status === 'present' && <Check className='w-4 h-4' />}
+                                {status === 'absent' && <X className='w-4 h-4' />}
+                              </button>
+
+                              {showOptions === key && (
+                                <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20'>
+                                  <div className='bg-white rounded-lg shadow-lg border border-gray-200 p-2 flex gap-2'>
+                                    <button
+                                      onClick={() => markAttendance(sid(student), d.dateStr, 'present')}
+                                      className='w-10 h-10 bg-[#4ADE80] text-white rounded-md flex items-center justify-center hover:bg-[#22C55E] transition'
+                                    >
+                                      <Check className='w-5 h-5' />
+                                    </button>
+                                    <button
+                                      onClick={() => markAttendance(sid(student), d.dateStr, 'absent')}
+                                      className='w-10 h-10 bg-[#EF4444] text-white rounded-md flex items-center justify-center hover:bg-[#DC2626] transition'
+                                    >
+                                      <X className='w-5 h-5' />
+                                    </button>
+                                  </div>
+                                  <div className='absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white' />
+                                </div>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+      {/* backdrop to close options */}
+      {showOptions && <div className='fixed inset-0 z-10' onClick={() => setShowOptions(null)} />}
+    </div>
+  )
 }
 
 export default MentorDetail

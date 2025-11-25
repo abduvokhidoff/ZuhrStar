@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
+// src/pages/Dashboard.jsx
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { setCredentials } from '../../redux/authSlice'
 import axios from 'axios'
@@ -6,6 +7,32 @@ import Oquvchilar from './Oquvchilar'
 import Guruhlar from './Guruhlar'
 import Mentorlar from './Mentorlar'
 import Tolovlar from './Tolovlar'
+import { useNavigate } from 'react-router-dom'
+
+// Chart.js
+import {
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	PointElement,
+	LineElement,
+	Title,
+	Tooltip,
+	Filler,
+	Legend,
+} from 'chart.js'
+import { Line } from 'react-chartjs-2'
+
+ChartJS.register(
+	CategoryScale,
+	LinearScale,
+	PointElement,
+	LineElement,
+	Title,
+	Tooltip,
+	Filler,
+	Legend
+)
 
 const API_BASE =
 	import.meta?.env?.VITE_API_URL?.replace(/\/$/, '') ||
@@ -14,6 +41,7 @@ const API_BASE =
 export default function Dashboard() {
 	const dispatch = useDispatch()
 	const { accessToken, refreshToken } = useSelector(s => s.auth)
+	const navigate = useNavigate()
 
 	const [students, setStudents] = useState([])
 	const [groups, setGroups] = useState([])
@@ -21,15 +49,15 @@ export default function Dashboard() {
 	const [checks, setChecks] = useState([])
 	const [loading, setLoading] = useState(true)
 	const [err, setErr] = useState('')
+
 	const [activePage, setActivePage] = useState('dashboard')
 
+	// ===== AUTH & API =====
 	const refreshAccessToken = async () => {
 		const res = await axios.post(
 			`${API_BASE}/auth/refresh`,
 			{ refreshToken },
-			{
-				headers: { 'Content-Type': 'application/json' },
-			}
+			{ headers: { 'Content-Type': 'application/json' } }
 		)
 		dispatch(
 			setCredentials({
@@ -86,6 +114,7 @@ export default function Dashboard() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [accessToken])
 
+	// ===== HELPERS =====
 	const safeDate = v => {
 		const raw =
 			v?.date_of_payment ||
@@ -136,6 +165,7 @@ export default function Dashboard() {
 		}, 0)
 	}, [checks])
 
+	// ===== LAST 12 MONTHS + динамический продолг =====
 	const last12Months = useMemo(() => {
 		const arr = []
 		const base = new Date()
@@ -153,6 +183,37 @@ export default function Dashboard() {
 		}
 		return arr
 	}, [])
+
+	const dailyRevenue = useMemo(() => {
+		if (!Array.isArray(checks)) return []
+		const startDate = new Date()
+		startDate.setDate(startDate.getDate() - 30) // последние 30 дней
+		const days = []
+		for (let i = 0; i <= 30; i++) {
+			const d = new Date(
+				startDate.getFullYear(),
+				startDate.getMonth(),
+				startDate.getDate() + i
+			)
+			const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+				2,
+				'0'
+			)}-${String(d.getDate()).padStart(2, '0')}`
+			days.push({ label, date: d, amount: 0 })
+		}
+		checks.forEach(c => {
+			const dt = safeDate(c)
+			if (!dt) return
+			const label = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(
+				2,
+				'0'
+			)}-${String(dt.getDate()).padStart(2, '0')}`
+			const day = days.find(x => x.label === label)
+			if (day)
+				day.amount += number(c?.amount ?? c?.summa ?? c?.price ?? c?.total ?? 0)
+		})
+		return days
+	}, [checks])
 
 	const monthlyRevenue = useMemo(() => {
 		const bucket = Object.fromEntries(last12Months.map(x => [x.label, 0]))
@@ -181,126 +242,12 @@ export default function Dashboard() {
 			)}`
 			if (perMonth[L] !== undefined) perMonth[L] += 1
 		})
+		// кумулятивно по месяцам
 		const labels = last12Months.map(x => x.label)
 		let run = 0
 		const cumulative = labels.map(L => (run += perMonth[L]))
 		return { labels, cumulative }
 	}, [groups, last12Months])
-
-	const makeLinePath = (values, w = 700, h = 220, pad = 14) => {
-		const num = v => (typeof v === 'string' ? Number(v) : v) || 0
-		const data = values.map(num)
-		const min = Math.min(...data, 0)
-		const max = Math.max(...data, 1)
-		const range = Math.max(max - min, 1)
-
-		const innerW = w - pad * 2
-		const innerH = h - pad * 2
-		const x = i =>
-			data.length <= 1
-				? pad + innerW / 2
-				: pad + (i * innerW) / (data.length - 1)
-		const y = v => pad + innerH - ((v - min) / range) * innerH
-
-		const pts = data.map((v, i) => ({ x: x(i), y: y(v), v }))
-
-		if (pts.length === 0) return { d: '', area: '', points: [] }
-		if (pts.length === 1) {
-			const p = pts[0],
-				base = pad + innerH
-			return {
-				d: `M ${p.x} ${p.y}`,
-				area: `M ${p.x} ${p.y} L ${p.x} ${base} Z`,
-				points: [{ cx: p.x, cy: p.y, v: data[0] }],
-			}
-		}
-		if (pts.length === 2) {
-			const [p0, p1] = pts
-			const base = pad + innerH
-			return {
-				d: `M ${p0.x} ${p0.y} L ${p1.x} ${p1.y}`,
-				area: `M ${p0.x} ${p0.y} L ${p1.x} ${p1.y} L ${p1.x} ${base} L ${p0.x} ${base} Z`,
-				points: pts.map((p, i) => ({ cx: p.x, cy: p.y, v: data[i] })),
-			}
-		}
-
-		const xs = pts.map(p => p.x)
-		const ys = pts.map(p => p.y)
-
-		const dx = xs.slice(1).map((x, i) => x - xs[i])
-		const dy = ys.slice(1).map((y, i) => y - ys[i])
-		const m = dx.map((d, i) => (d === 0 ? 0 : dy[i] / d))
-
-		const t = new Array(ys.length).fill(0)
-		t[0] = m[0]
-		t[ys.length - 1] = m[m.length - 1]
-		for (let i = 1; i < ys.length - 1; i++) {
-			if (m[i - 1] * m[i] <= 0) {
-				t[i] = 0
-			} else {
-				t[i] = (2 * m[i - 1] * m[i]) / (m[i - 1] + m[i])
-			}
-		}
-
-		for (let i = 0; i < m.length; i++) {
-			if (m[i] === 0) {
-				t[i] = 0
-				t[i + 1] = 0
-				continue
-			}
-			const a = t[i] / m[i]
-			const b = t[i + 1] / m[i]
-			const s = a * a + b * b
-			if (s > 9) {
-				const tau = 3 / Math.sqrt(s)
-				t[i] = tau * a * m[i]
-				t[i + 1] = tau * b * m[i]
-			}
-		}
-
-		let d = `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`
-		for (let i = 0; i < m.length; i++) {
-			const x0 = xs[i],
-				y0 = ys[i]
-			const x1 = xs[i + 1],
-				y1 = ys[i + 1]
-			const dx01 = x1 - x0
-
-			const cp1x = x0 + dx01 / 3
-			const cp1y = y0 + (t[i] * dx01) / 3
-
-			const cp2x = x1 - dx01 / 3
-			const cp2y = y1 - (t[i + 1] * dx01) / 3
-
-			const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
-			const yMin = pad,
-				yMax = pad + innerH
-			const CP1Y = clamp(cp1y, yMin, yMax)
-			const CP2Y = clamp(cp2y, yMin, yMax)
-
-			d += ` C ${cp1x.toFixed(2)} ${CP1Y.toFixed(2)} ${cp2x.toFixed(
-				2
-			)} ${CP2Y.toFixed(2)} ${x1.toFixed(2)} ${y1.toFixed(2)}`
-		}
-
-		const base = pad + innerH
-		const first = pts[0],
-			last = pts[pts.length - 1]
-		const area = `${d} L ${last.x.toFixed(2)} ${base} L ${first.x.toFixed(
-			2
-		)} ${base} Z`
-
-		const points = pts.map((p, i) => ({ cx: p.x, cy: p.y, v: data[i] }))
-		return { d, area, points }
-	}
-
-	const revLabels = last12Months.map(x => x.label)
-	const revValues = revLabels.map(L => monthlyRevenue[L] || 0)
-	const growthLabels = groupGrowth.labels
-	const growthValues = groupGrowth.cumulative
-
-	const revPath = makeLinePath(revValues)
-	const growthPath = makeLinePath(growthValues)
 
 	const last5Students = useMemo(() => {
 		const copy = [...students]
@@ -321,20 +268,17 @@ export default function Dashboard() {
 	}, [groups])
 
 	// ===== PAGE NAVIGATION =====
-	if (activePage === 'oquvchilar') {
+	if (activePage === 'oquvchilar')
 		return (
 			<Oquvchilar data={students} onBack={() => setActivePage('dashboard')} />
 		)
-	}
-	if (activePage === 'guruhlar') {
+	if (activePage === 'guruhlar')
 		return <Guruhlar data={groups} onBack={() => setActivePage('dashboard')} />
-	}
-	if (activePage === 'mentorlar') {
+	if (activePage === 'mentorlar')
 		return (
 			<Mentorlar data={teachers} onBack={() => setActivePage('dashboard')} />
 		)
-	}
-	if (activePage === 'tolovlar') {
+	if (activePage === 'tolovlar')
 		return (
 			<Tolovlar
 				data={checks}
@@ -343,11 +287,12 @@ export default function Dashboard() {
 				onBack={() => setActivePage('dashboard')}
 			/>
 		)
-	}
 
+	// ===== RENDER DASHBOARD =====
 	return (
-		<div className='min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50'>
+		<div className='min-h-screen'>
 			<div className='mx-auto max-w-7xl p-6'>
+				{/* HEADER */}
 				<div className='mb-6 flex items-center justify-between'>
 					<h1 className='text-2xl font-extrabold tracking-tight'>Dashboard</h1>
 					<div className='flex items-center gap-3'>
@@ -365,6 +310,7 @@ export default function Dashboard() {
 					</div>
 				</div>
 
+				{/* ERROR */}
 				{err && (
 					<div className='mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700'>
 						<span>{err}</span>
@@ -377,6 +323,7 @@ export default function Dashboard() {
 					</div>
 				)}
 
+				{/* STATS CARDS */}
 				<div className='mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4'>
 					{[
 						{
@@ -385,7 +332,7 @@ export default function Dashboard() {
 							emoji: '🎓',
 							ring: 'ring-blue-200',
 							grad: 'from-blue-500/10 to-blue-500/0',
-							onClick: () => setActivePage('oquvchilar'),
+							onClick: () => navigate("/admin/o'quvchilar"),
 						},
 						{
 							label: 'GURUHLAR',
@@ -393,7 +340,7 @@ export default function Dashboard() {
 							emoji: '👥',
 							ring: 'ring-indigo-200',
 							grad: 'from-indigo-500/10 to-indigo-500/0',
-							onClick: () => setActivePage('guruhlar'),
+							onClick: () => navigate('/admin/guruhlar'),
 						},
 						{
 							label: 'MENTORLAR',
@@ -401,7 +348,7 @@ export default function Dashboard() {
 							emoji: '🧑‍🏫',
 							ring: 'ring-emerald-200',
 							grad: 'from-emerald-500/10 to-emerald-500/0',
-							onClick: () => setActivePage('mentorlar'),
+							onClick: () => navigate('/admin/mentorlar'),
 						},
 						{
 							label: "KUNLIK TO'LOVLAR",
@@ -409,7 +356,7 @@ export default function Dashboard() {
 							emoji: '🧾',
 							ring: 'ring-amber-200',
 							grad: 'from-amber-500/10 to-amber-500/0',
-							onClick: () => setActivePage('tolovlar'),
+							onClick: () => navigate("/admin/to'lovlar"),
 						},
 					].map((k, i) => (
 						<div
@@ -439,27 +386,31 @@ export default function Dashboard() {
 					))}
 				</div>
 
+				{/* CHARTS */}
 				<div className='mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2'>
 					<ChartCard
 						title='Oylik tushum'
-						labels={revLabels}
-						path={revPath}
+						labels={last12Months.map(x => x.label)}
+						values={last12Months.map(x => monthlyRevenue[x.label] || 0)}
 						stroke='#4f46e5'
-						fillFrom='#6366f1'
-						fillTo='#a5b4fc'
-						valueFormatter={i => fmtNum(revValues[i] || 0)}
+						fillFrom='rgba(99,102,241,0.3)'
+						fillTo='rgba(165,180,252,0.05)'
+						valueFormatter={i =>
+							fmtNum(monthlyRevenue[last12Months[i].label] || 0)
+						}
 					/>
 					<ChartCard
 						title="Guruh o'sish dinamikasi"
-						labels={growthLabels}
-						path={growthPath}
+						labels={groupGrowth.labels}
+						values={groupGrowth.cumulative}
 						stroke='#10b981'
-						fillFrom='#34d399'
-						fillTo='#a7f3d0'
-						valueFormatter={i => String(growthValues[i] || 0)}
+						fillFrom='rgba(52,211,153,0.3)'
+						fillTo='rgba(167,243,208,0.05)'
+						valueFormatter={i => String(groupGrowth.cumulative[i] || 0)}
 					/>
 				</div>
 
+				{/* LAST ITEMS */}
 				<div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
 					<ListCard
 						title="Oxirgi 5 ta o'quvchi"
@@ -501,192 +452,69 @@ export default function Dashboard() {
 	)
 }
 
-function slugifyId(str = '') {
-	return String(str)
-		.toLowerCase()
-		.normalize('NFKD')
-		.replace(/[\u0300-\u036f]/g, '')
-		.replace(/[^a-z0-9_-]/g, '-')
-		.replace(/-+/g, '-')
-		.replace(/^-|-$/g, '')
-}
-
+// ===== CHARTCARD =====
 function ChartCard({
 	title,
 	labels,
-	path,
+	values,
 	stroke,
 	fillFrom,
 	fillTo,
 	valueFormatter,
 }) {
-	const w = 700,
-		h = 220,
-		pad = 14
-	const gradId = `grad-${slugifyId(title)}-${labels?.[0] ?? 'a'}`
-
-	const [hover, setHover] = React.useState(null)
-	const svgRef = React.useRef(null)
-
-	const findNearest = clientX => {
-		const svg = svgRef.current
-		if (!svg) return null
-		const rect = svg.getBoundingClientRect()
-		const xInSvg = ((clientX - rect.left) / rect.width) * w
-		if (!Array.isArray(path?.points) || !path.points.length) return null
-
-		let best = 0
-		let bestDx = Math.abs(path.points[0].cx - xInSvg)
-		for (let i = 1; i < path.points.length; i++) {
-			const dx = Math.abs(path.points[i].cx - xInSvg)
-			if (dx < bestDx) {
-				bestDx = dx
-				best = i
-			}
-		}
-		const p = path.points[best]
-		return { idx: best, x: p.cx, y: p.cy }
+	const data = {
+		labels,
+		datasets: [
+			{
+				label: title,
+				data: values,
+				fill: true,
+				backgroundColor: ctx => {
+					const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 220)
+					gradient.addColorStop(0, fillFrom)
+					gradient.addColorStop(1, fillTo)
+					return gradient
+				},
+				borderColor: stroke,
+				tension: 0.4,
+				pointRadius: 3,
+				pointHoverRadius: 5,
+				pointBackgroundColor: stroke,
+			},
+		],
 	}
 
-	const onMove = e => {
-		const nearest = findNearest(e.clientX)
-		if (nearest) setHover(nearest)
+	const options = {
+		responsive: true,
+		maintainAspectRatio: false,
+		plugins: {
+			legend: { display: false },
+			tooltip: {
+				callbacks: {
+					label: ctx => valueFormatter(ctx.dataIndex),
+				},
+			},
+		},
+		animation: { duration: 800, easing: 'easeOutQuart' },
+		scales: {
+			x: { grid: { display: false } },
+			y: { grid: { color: '#f1f5f9' }, beginAtZero: true },
+		},
 	}
-	const onLeave = () => setHover(null)
 
 	return (
 		<div className='rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md'>
 			<div className='mb-3 flex items-center justify-between'>
 				<div className='font-semibold text-slate-800'>{title}</div>
-				<div className='text-xs text-slate-500'>
-					{labels?.[0]?.slice(2)} — {labels?.[labels.length - 1]?.slice(2)}
-				</div>
 			</div>
-
 			<div className='relative w-full h-[220px]'>
-				{hover && (
-					<div
-						className='pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-lg bg-white/95 px-2 py-1 text-xs shadow-md ring-1 ring-slate-200'
-						style={{
-							left: `${(hover.x / w) * 100}%`,
-							top: `${(hover.y / h) * 100}%`,
-						}}
-					>
-						<div className='font-medium text-slate-800'>
-							{labels[hover.idx]}
-						</div>
-						<div className='text-slate-600'>{valueFormatter(hover.idx)}</div>
-					</div>
-				)}
-
-				<svg
-					ref={svgRef}
-					viewBox={`0 0 ${w} ${h}`}
-					preserveAspectRatio='none'
-					className='absolute inset-0 w-full h-full'
-					style={{ background: 'transparent' }}
-					role='img'
-					aria-label={title}
-					onMouseMove={onMove}
-					onMouseLeave={onLeave}
-				>
-					<defs>
-						<linearGradient id={gradId} x1='0' x2='0' y1='0' y2='1'>
-							<stop offset='0%' stopColor={fillFrom} stopOpacity='0.30' />
-							<stop offset='100%' stopColor={fillTo} stopOpacity='0.06' />
-						</linearGradient>
-					</defs>
-
-					<g stroke='#e5e7eb'>
-						<line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} />
-						<line
-							x1={pad}
-							y1={h - 60}
-							x2={w - pad}
-							y2={h - 60}
-							stroke='#f1f5f9'
-						/>
-						<line x1={pad} y1={h - 108} x2={w - pad} y2={h - 108} />
-						<line
-							x1={pad}
-							y1={h - 154}
-							x2={w - pad}
-							y2={h - 154}
-							stroke='#f1f5f9'
-						/>
-						<line x1={pad} y1={pad + 4} x2={w - pad} y2={pad + 4} />
-					</g>
-
-					<path d={path.area} fill={`url(#${gradId})`} />
-					<path
-						d={path.d}
-						fill='none'
-						stroke={stroke}
-						strokeWidth='2.5'
-						strokeLinecap='round'
-						strokeLinejoin='round'
-					/>
-
-					{path.points.map((p, i) => (
-						<g key={i}>
-							<circle
-								cx={p.cx}
-								cy={p.cy}
-								r={hover?.idx === i ? 4.5 : 3.2}
-								fill={stroke}
-							>
-								<title>{`${labels[i]}: ${valueFormatter(i)}`}</title>
-							</circle>
-						</g>
-					))}
-
-					{hover && (
-						<g>
-							<line
-								x1={hover.x}
-								y1={pad}
-								x2={hover.x}
-								y2={h - pad}
-								stroke='#94a3b8'
-								strokeDasharray='3 3'
-							/>
-						</g>
-					)}
-
-					{labels.map((L, i) => {
-						const x =
-							labels.length <= 1
-								? w / 2
-								: pad + (i * (w - pad * 2)) / (labels.length - 1)
-						return (
-							<text
-								key={L}
-								x={x}
-								y={h - 4}
-								textAnchor='middle'
-								className='fill-slate-400 text-[10px] select-none'
-							>
-								{L.slice(2)}
-							</text>
-						)
-					})}
-
-					<rect
-						x={0}
-						y={0}
-						width={w}
-						height={h}
-						fill='transparent'
-						pointerEvents='all'
-						onMouseMove={onMove}
-						onMouseLeave={onLeave}
-					/>
-				</svg>
+				<Line data={data} options={options} />
 			</div>
 		</div>
 	)
 }
 
+// ===== LISTCARD =====
 function ListCard({ title, items, loading, empty }) {
 	return (
 		<div className='rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition hover:shadow-md'>
@@ -711,23 +539,21 @@ function ListCard({ title, items, loading, empty }) {
 								className='group flex items-center justify-between px-2 py-3 transition hover:bg-slate-50/70'
 							>
 								<div>
-									<div className='flex items-center gap-2'>
-										<span className='font-medium text-slate-800'>
+									<div className='flex flex-col'>
+										<span className='font-medium text-slate-900'>
 											{it.primary}
 										</span>
-										{it.secondary && (
-											<span className='rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 group-hover:bg-slate-200'>
-												{it.secondary}
-											</span>
-										)}
+										<span className='text-sm text-slate-500'>
+											{it.secondary}
+										</span>
 									</div>
 								</div>
-								<div className='text-xs text-slate-500'>{it.meta}</div>
+								<div className='text-xs text-slate-400'>{it.meta}</div>
 							</li>
 						))}
 					</ul>
 				) : (
-					<div className='text-sm text-slate-500'>{empty}</div>
+					<div className='text-center py-6 text-sm text-slate-400'>{empty}</div>
 				)}
 			</div>
 		</div>

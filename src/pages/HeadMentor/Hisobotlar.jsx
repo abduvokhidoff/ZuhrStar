@@ -1,24 +1,61 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { Eye, Search, Download, TrendingUp } from 'lucide-react';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, Title, Tooltip, Legend, ArcElement, PointElement } from 'chart.js';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { setCredentials, logout } from '../../redux/authSlice';
+// Hisobotlar.jsx
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
+import { Eye, Search, Download, TrendingUp } from 'lucide-react'
+import {
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	LineElement,
+	Title,
+	Tooltip,
+	Legend,
+	ArcElement,
+	PointElement,
+} from 'chart.js'
+import { Bar, Doughnut, Line } from 'react-chartjs-2'
+import { setCredentials, logout } from '../../redux/authSlice'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, ArcElement);
+ChartJS.register(
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	LineElement,
+	PointElement,
+	Title,
+	Tooltip,
+	Legend,
+	ArcElement
+)
+
+// ------- Configuration: adapt if your backend fields differ -------
+const API_BASE = 'https://zuhrstar-production.up.railway.app'
+const PAYMENT_ENDPOINT = '/api/checks'
+const STUDENTS_ENDPOINT = '/api/students'
+const COURSES_ENDPOINT = '/api/Courses'
+const GROUPS_ENDPOINT = '/api/groups'
+// If your payment date field is named differently, update here:
+const PAYMENT_DATE_FIELD = 'date_Of_Create' // or 'date_of_payment'
+// ------------------------------------------------------------------
 
 const Hisobotlar = () => {
 	const dispatch = useDispatch()
-	const { accessToken, refreshToken, user } = useSelector(state => state.auth)
-
+	const { accessToken, refreshToken, user } = useSelector(s => s.auth || {})
 	const [students, setStudents] = useState([])
+	const [notFilteredPayments, setNotFilteredPayments] = useState([])
 	const [payments, setPayments] = useState([])
 	const [courses, setCourses] = useState([])
 	const [groups, setGroups] = useState([])
 	const [loading, setLoading] = useState(true)
+
+	// UI state
 	const [searchTerm, setSearchTerm] = useState('')
 	const [selectedStatus, setSelectedStatus] = useState('Barchasi')
 	const [activeTab, setActiveTab] = useState('dashboard')
+	const [showOnlyThisMonth, setShowOnlyThisMonth] = useState(true) // shows only current month's payments by default
+
+	// previous stats placeholder (keeps your original logic)
 	const [previousStats, setPreviousStats] = useState({
 		total: 0,
 		active: 0,
@@ -26,21 +63,19 @@ const Hisobotlar = () => {
 		revenue: 0,
 	})
 
+	// ---------- Token refresh + request wrapper ----------
 	const refreshAccessToken = useCallback(async () => {
 		if (!refreshToken) {
 			dispatch(logout())
 			return null
 		}
 		try {
-			const res = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/users/refresh',
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ refreshToken }),
-				}
-			)
-			if (!res.ok) throw new Error()
+			const res = await fetch(`${API_BASE}/api/users/refresh`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ refreshToken }),
+			})
+			if (!res.ok) throw new Error('refresh failed')
 			const data = await res.json()
 			dispatch(
 				setCredentials({
@@ -50,7 +85,7 @@ const Hisobotlar = () => {
 				})
 			)
 			return data.accessToken
-		} catch {
+		} catch (err) {
 			dispatch(logout())
 			return null
 		}
@@ -58,39 +93,49 @@ const Hisobotlar = () => {
 
 	const makeRequest = useCallback(
 		async (url, options = {}) => {
-			const attemptRequest = async token => {
+			const attempt = async token => {
 				const res = await fetch(url, {
 					...options,
 					headers: {
 						'Content-Type': 'application/json',
-						Authorization: `Bearer ${token}`,
+						Authorization: token ? `Bearer ${token}` : undefined,
 						...options.headers,
 					},
 				})
 				if (res.status === 401) {
 					const newToken = await refreshAccessToken()
-					if (!newToken) throw new Error()
-					return await attemptRequest(newToken)
+					if (!newToken) throw new Error('unauthorized')
+					return attempt(newToken)
 				}
-				if (!res.ok) throw new Error()
+				if (!res.ok) {
+					// try to read body if JSON for debugging
+					let txt = ''
+					try {
+						txt = await res.text()
+					} catch {}
+					const err = new Error(`Request failed: ${res.status} ${txt}`)
+					err.status = res.status
+					throw err
+				}
 				return res
 			}
-			return await attemptRequest(accessToken)
+			return attempt(accessToken)
 		},
 		[accessToken, refreshAccessToken]
 	)
+	// -----------------------------------------------------
 
+	// ---------- Fetch all data ----------
 	const fetchData = useCallback(async () => {
 		try {
 			setLoading(true)
+
 			const [studentsRes, paymentsRes, coursesRes, groupsRes] =
 				await Promise.all([
-					makeRequest(
-						'https://zuhrstar-production.up.railway.app/api/students'
-					),
-					makeRequest('https://zuhrstar-production.up.railway.app/api/checks'),
-					makeRequest('https://zuhrstar-production.up.railway.app/api/Courses'),
-					makeRequest('https://zuhrstar-production.up.railway.app/api/groups'),
+					makeRequest(`${API_BASE}${STUDENTS_ENDPOINT}`),
+					makeRequest(`${API_BASE}${PAYMENT_ENDPOINT}`),
+					makeRequest(`${API_BASE}${COURSES_ENDPOINT}`),
+					makeRequest(`${API_BASE}${GROUPS_ENDPOINT}`),
 				])
 
 			const studentsData = await studentsRes.json()
@@ -98,31 +143,47 @@ const Hisobotlar = () => {
 			const coursesData = await coursesRes.json()
 			const groupsData = await groupsRes.json()
 
-			setStudents(studentsData)
-			setPayments(paymentsData)
-			setCourses(coursesData)
-			setGroups(groupsData)
+			// If your API returns wrapper { data: [...] } adjust here:
+			// const paymentsArr = paymentsData.data || paymentsData;
+			const studentsArr = Array.isArray(studentsData)
+				? studentsData
+				: studentsData
+			const paymentsArr = Array.isArray(paymentsData)
+				? paymentsData
+				: paymentsData
+			const coursesArr = Array.isArray(coursesData) ? coursesData : coursesData
+			const groupsArr = Array.isArray(groupsData) ? groupsData : groupsData
 
+			setStudents(studentsArr || [])
+			setNotFilteredPayments(paymentsArr || [])
+			setPayments(paymentsArr || [])
+			setCourses(coursesArr || [])
+			setGroups(groupsArr || [])
+
+			// build previous month stats example (same idea as your initial code)
 			const now = new Date()
-			const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+			const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 			const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0)
 
-			const lastMonthPayments = paymentsData.filter(p => {
-				const date = new Date(p.date_Of_Create)
-				return date >= lastMonth && date <= lastMonthEnd
+			const lastMonthPayments = (paymentsArr || []).filter(p => {
+				const d = new Date(p[PAYMENT_DATE_FIELD])
+				return d >= lastMonthStart && d <= lastMonthEnd
 			})
 
 			setPreviousStats({
-				total: studentsData.length * 0.9,
-				active: studentsData.filter(s => s.status === 'active').length * 0.9,
-				paid: studentsData.filter(s => s.paid === true).length * 1.1,
-				revenue: lastMonthPayments.reduce(
-					(sum, p) => sum + parseInt(p.amount),
-					0
-				),
+				total: (studentsArr?.length || 0) * 0.9,
+				active:
+					(studentsArr?.filter(s => s.status === 'active').length || 0) * 0.9,
+				paid: (studentsArr?.filter(s => s.paid === true).length || 0) * 1.1,
+				revenue: lastMonthPayments.reduce((sum, p) => {
+					const v = parseInt(p.amount) || 0
+					return sum + v
+				}, 0),
 			})
 		} catch (err) {
-			console.error(err)
+			// keep logging but do not crash UI
+			// eslint-disable-next-line no-console
+			console.error('fetchData error', err)
 		} finally {
 			setLoading(false)
 		}
@@ -132,42 +193,74 @@ const Hisobotlar = () => {
 		fetchData()
 	}, [fetchData])
 
-	const totalStudents = students.length
-	const activeStudents = students.filter(s => s.status === 'active').length
-	const paidStudents = students.filter(s => s.paid === true).length
-	const totalRevenue = payments.reduce((sum, p) => sum + parseInt(p.amount), 0)
+	// ---------- Derived / computed data (useMemo) ----------
+	const totalStudents = useMemo(() => students.length, [students])
+	const activeStudents = useMemo(
+		() => students.filter(s => s.status === 'active').length,
+		[students]
+	)
+	const paidStudents = useMemo(
+		() => students.filter(s => s.paid === true).length,
+		[students]
+	)
 
-	const totalGrowth =
-		previousStats.total > 0
-			? (
-					((totalStudents - previousStats.total) / previousStats.total) *
-					100
-			  ).toFixed(2)
-			: 0
-	const activeGrowth =
-		previousStats.active > 0
-			? (
-					((activeStudents - previousStats.active) / previousStats.active) *
-					100
-			  ).toFixed(2)
-			: 0
-	const paidGrowth =
-		previousStats.paid > 0
-			? (
-					((paidStudents - previousStats.paid) / previousStats.paid) *
-					100
-			  ).toFixed(2)
-			: 0
-	const revenueGrowth =
-		previousStats.revenue > 0
-			? (
-					((totalRevenue - previousStats.revenue) / previousStats.revenue) *
-					100
-			  ).toFixed(2)
-			: 0
+	// paymentsFiltered: apply "this month" filter if set
+	const paymentsFiltered = useMemo(() => {
+		if (!Array.isArray(payments)) return []
+		if (!showOnlyThisMonth) return payments
 
-	const monthlyPayments = (() => {
-		const months = [
+		const now = new Date()
+		const month = now.getMonth()
+		const year = now.getFullYear()
+
+		return payments.filter(p => {
+			const raw = p[PAYMENT_DATE_FIELD] || p.date_of_payment || p.date
+			if (!raw) return false
+			const d = new Date(raw)
+			return d.getMonth() === month && d.getFullYear() === year
+		})
+	}, [payments, showOnlyThisMonth])
+
+	// totalRevenue based on filtered payments (so charts and cards show the same)
+	const totalRevenue = useMemo(
+		() =>
+			paymentsFiltered.reduce((sum, p) => {
+				const v = parseInt(p.amount)
+				return sum + (isNaN(v) ? 0 : v)
+			}, 0),
+		[paymentsFiltered]
+	)
+
+	// Growth calculations
+	const computeGrowth = (current, prev) => {
+		if (!prev || prev === 0) return '0.00'
+		return (((current - prev) / prev) * 100).toFixed(2)
+	}
+
+	const totalGrowth = computeGrowth(totalStudents, previousStats.total)
+	const activeGrowth = computeGrowth(activeStudents, previousStats.active)
+	const paidGrowth = computeGrowth(paidStudents, previousStats.paid)
+	const revenueGrowth = computeGrowth(totalRevenue, previousStats.revenue)
+
+	// Monthly aggregation for charts (for current year)
+	const monthlyPayments = useMemo(() => {
+		// create 12 months
+		const months = Array.from({ length: 12 }, (_, i) => ({
+			month: i,
+			total: 0,
+		}))
+		const yearNow = new Date().getFullYear()
+		;(payments || []).forEach(p => {
+			const raw = p[PAYMENT_DATE_FIELD] || p.date_of_payment || p.date
+			if (!raw) return
+			const d = new Date(raw)
+			if (d.getFullYear() !== yearNow) return // only current year
+			const m = d.getMonth()
+			const amount = parseInt(p.amount)
+			months[m].total += isNaN(amount) ? 0 : amount
+		})
+
+		const labels = [
 			'Jan',
 			'Feb',
 			'Mar',
@@ -181,113 +274,144 @@ const Hisobotlar = () => {
 			'Nov',
 			'Dec',
 		]
-		const data = months.map(m => ({ month: m, total: 0 }))
 
-		payments.forEach(p => {
-			const date = new Date(p.date_Of_Create)
-			const monthIndex = date.getMonth()
-			data[monthIndex].total += parseInt(p.amount)
+		return months.map((m, idx) => ({ month: labels[idx], total: m.total }))
+	}, [payments])
+
+	// Course distribution (students counted uniquely per group)
+	const courseDistribution = useMemo(() => {
+		if (!Array.isArray(courses) || !Array.isArray(groups)) return []
+
+		const courseMap = {}
+		courses.forEach(c => {
+			const name = c.name || c.title || 'Unknown'
+			courseMap[name] = new Set()
 		})
 
-		return data
-	})()
-
-	const courseDistribution = (() => {
-		// Debug: Ma'lumotlarni ko'rish
-		console.log('Groups:', groups)
-		console.log('Courses:', courses)
-		console.log('Total Students:', totalStudents)
-
-		const courseStats = {}
 		const uniqueStudents = new Set()
 
-		courses.forEach(course => {
-			courseStats[course.name] = new Set()
+		;(groups || []).forEach(g => {
+			const courseName = g.course || g.courseName || ''
+			if (!courseName || !courseMap[courseName]) return
+			const arr = Array.isArray(g.students) ? g.students : []
+			arr.forEach(sid => {
+				courseMap[courseName].add(sid)
+				uniqueStudents.add(sid)
+			})
 		})
 
-		// Har bir talabani faqat bir marta sanash uchun
-		groups.forEach(group => {
-			console.log(
-				'Processing group:',
-				group.name,
-				'Course:',
-				group.course,
-				'Students:',
-				group.students
-			)
-
-			if (group.course && courseStats.hasOwnProperty(group.course)) {
-				if (Array.isArray(group.students)) {
-					group.students.forEach(studentId => {
-						courseStats[group.course].add(studentId)
-						uniqueStudents.add(studentId)
-					})
-				}
-			}
-		})
-
-		console.log('Course Stats:', courseStats)
-		console.log('Total Unique Students in Groups:', uniqueStudents.size)
-
-		// Agar gurppalarda talaba bo'lmasa, jami talabalardan foydalanamiz
-		const totalForCalculation =
+		const totalForCalc =
 			uniqueStudents.size > 0 ? uniqueStudents.size : totalStudents
 
-		const coursesWithData = courses
-			.map(course => {
-				const count = courseStats[course.name].size
-				const percentage =
-					totalForCalculation > 0 ? (count / totalForCalculation) * 100 : 0
-
-				return {
-					name: course.name,
-					count: count,
-					percentage: percentage,
-				}
+		const result = Object.keys(courseMap)
+			.map(name => {
+				const count = courseMap[name].size
+				const percentage = totalForCalc > 0 ? (count / totalForCalc) * 100 : 0
+				return { name, count, percentage: Math.round(percentage) }
 			})
 			.filter(c => c.count > 0)
 
-		// Agar hech qanday ma'lumot bo'lmasa
-		if (coursesWithData.length === 0) {
-			return []
+		// normalize if rounding error
+		let sumPerc = result.reduce((s, r) => s + r.percentage, 0)
+		if (sumPerc !== 100 && result.length > 0) {
+			result[0].percentage = result[0].percentage + (100 - sumPerc)
 		}
 
-		// Foizlarni normalize qilamiz
-		let totalPercentage = coursesWithData.reduce(
-			(sum, c) => sum + Math.round(c.percentage),
-			0
+		return result
+	}, [courses, groups, totalStudents])
+	// -------------------------------------------------------
+
+	// ----------------- Utilities -----------------
+	const formatCurrency = amount => {
+		const n = Number(amount) || 0
+		return new Intl.NumberFormat('uz-UZ').format(n) + ' UZS'
+	}
+
+	const formatRevenueShort = amount => {
+		const n = Number(amount) || 0
+		if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+		if (n >= 1000) return Math.round(n / 1000) + 'K'
+		return n
+	}
+	// ---------------------------------------------
+
+	// --------------- CSV Export ------------------
+	const exportToCSV = () => {
+		const rows = [
+			['ID', 'Ism', 'Familiya', 'Telefon', 'Holati', 'Tolov', 'Balans'],
+			...students.map((s, i) => [
+				i + 1,
+				s.name || '',
+				s.surname || '',
+				s.student_phone || '',
+				s.status === 'active' ? 'Faol' : 'Nofaol',
+				s.paid ? 'Toʻlangan' : 'Qarzdor',
+				s.balance || 0,
+			]),
+		]
+		const csv = rows
+			.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+			.join('\n')
+		const blob = new Blob([csv], { type: 'text/csv' })
+		const link = document.createElement('a')
+		link.href = URL.createObjectURL(blob)
+		link.download = `talabalar_${new Date().toISOString().split('T')[0]}.csv`
+		link.click()
+	}
+	// ----------------------------------------------
+
+	// -------------- Chart datasets ----------------
+	const lineChartData = useMemo(
+		() => ({
+			labels: monthlyPayments.map(m => m.month),
+			datasets: [
+				{
+					label: "Oylar bo'yicha tushum (ming so'm)",
+					data: monthlyPayments.map(m => Math.round(m.total)),
+					borderColor: '#0066cc',
+					backgroundColor: 'rgba(0,102,204,0.08)',
+					tension: 0.35,
+					fill: true,
+					pointRadius: 0,
+					borderWidth: 2,
+				},
+			],
+		}),
+		[monthlyPayments]
+	)
+
+	const doughnutData = useMemo(() => {
+		const paidCount = paymentsFiltered.length
+		const unpaidCount = Math.max(0, totalStudents - (paidCount || 0))
+		return {
+			labels: ['Toʻlangan', 'Toʻlanmagan'],
+			datasets: [
+				{
+					data: [paidCount, unpaidCount],
+					backgroundColor: ['#0066cc', '#e5e7eb'],
+					borderWidth: 0,
+				},
+			],
+		}
+	}, [paymentsFiltered, totalStudents])
+
+	// ------------------------------------------------
+
+	// If loading show spinner
+	if (loading) {
+		return (
+			<div className='flex items-center justify-center h-screen bg-gray-50'>
+				<div className='animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent'></div>
+			</div>
 		)
+	}
 
-		if (totalPercentage !== 100 && coursesWithData.length > 0) {
-			const diff = 100 - totalPercentage
-			coursesWithData[0].percentage =
-				Math.round(coursesWithData[0].percentage) + diff
-			for (let i = 1; i < coursesWithData.length; i++) {
-				coursesWithData[i].percentage = Math.round(
-					coursesWithData[i].percentage
-				)
-			}
-		} else {
-			coursesWithData.forEach(c => (c.percentage = Math.round(c.percentage)))
-		}
-
-		console.log('Final Course Distribution:', coursesWithData)
-
-		return coursesWithData
-	})()
-
-	const paidPercentage =
-		totalStudents > 0 ? ((paidStudents / totalStudents) * 100).toFixed(1) : 0
-	const unpaidPercentage =
-		totalStudents > 0
-			? (((totalStudents - paidStudents) / totalStudents) * 100).toFixed(1)
-			: 0
-
+	// Filter students for list
 	const filteredStudents = students.filter(s => {
 		const matchSearch =
 			s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
 			s.surname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			s.student_phone?.includes(searchTerm)
+			(s.student_phone || '').includes(searchTerm)
 		const matchStatus =
 			selectedStatus === 'Barchasi' ||
 			(selectedStatus === 'Faol' && s.status === 'active') ||
@@ -297,43 +421,14 @@ const Hisobotlar = () => {
 		return matchSearch && matchStatus
 	})
 
-	const formatCurrency = amount =>
-		new Intl.NumberFormat('uz-UZ').format(amount) + ' UZS'
-	const formatRevenue = amount => {
-		if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M'
-		if (amount >= 1000) return (amount / 1000).toFixed(0) + 'K'
-		return amount
-	}
+	const paidPercentage =
+		totalStudents > 0 ? ((paidStudents / totalStudents) * 100).toFixed(1) : 0
+	const unpaidPercentage =
+		totalStudents > 0
+			? (((totalStudents - paidStudents) / totalStudents) * 100).toFixed(1)
+			: 0
 
-	const exportToCSV = () => {
-		const csv = [
-			['ID', 'Ism', 'Familiya', 'Telefon', 'Holati', 'Tolov', 'Balans'],
-			...filteredStudents.map((s, i) => [
-				i + 1,
-				s.name,
-				s.surname,
-				s.student_phone,
-				s.status === 'active' ? 'Faol' : 'Nofaol',
-				s.paid ? 'Tolangan' : 'Qarzdor',
-				s.balance || 0,
-			]),
-		]
-			.map(row => row.join(','))
-			.join('\n')
-		const blob = new Blob([csv], { type: 'text/csv' })
-		const link = document.createElement('a')
-		link.href = URL.createObjectURL(blob)
-		link.download = `talabalar_${new Date().toISOString().split('T')[0]}.csv`
-		link.click()
-	}
-
-	if (loading)
-		return (
-			<div className='flex items-center justify-center h-screen bg-gray-50'>
-				<div className='animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent'></div>
-			</div>
-		)
-
+	// ---------- JSX (kept UI/layout similar to your original) ----------
 	return (
 		<div className='min-h-screen bg-gray-50'>
 			<div className='bg-white border-b border-gray-200'>
@@ -358,7 +453,19 @@ const Hisobotlar = () => {
 								</button>
 							))}
 						</div>
-						<div className='text-sm text-gray-500'></div>
+						<div className='text-sm text-gray-500'>
+							<label className='mr-3 text-xs text-gray-600'>Show:</label>
+							<select
+								value={showOnlyThisMonth ? 'thisMonth' : 'all'}
+								onChange={e =>
+									setShowOnlyThisMonth(e.target.value === 'thisMonth')
+								}
+								className='px-2 py-1 border rounded'
+							>
+								<option value='thisMonth'>This month (this year)</option>
+								<option value='all'>All payments</option>
+							</select>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -443,7 +550,7 @@ const Hisobotlar = () => {
 								<p className='text-sm text-gray-600 mb-2'>Umumiy tushum</p>
 								<div className='flex items-end justify-between'>
 									<h3 className='text-4xl font-bold text-gray-900'>
-										{formatRevenue(totalRevenue)}
+										{formatRevenueShort(totalRevenue)}
 									</h3>
 									<span
 										className={`text-xs font-medium flex items-center px-2 py-1 rounded ${
@@ -470,20 +577,7 @@ const Hisobotlar = () => {
 							</div>
 							<div className='h-80'>
 								<Line
-									data={{
-										labels: monthlyPayments.map(m => m.month),
-										datasets: [
-											{
-												data: monthlyPayments.map(m => m.total / 1000),
-												borderColor: '#0066cc',
-												backgroundColor: 'rgba(0, 102, 204, 0.1)',
-												tension: 0.4,
-												fill: true,
-												pointRadius: 0,
-												borderWidth: 3,
-											},
-										],
-									}}
+									data={lineChartData}
 									options={{
 										responsive: true,
 										maintainAspectRatio: false,
@@ -512,16 +606,7 @@ const Hisobotlar = () => {
 								<div className='flex items-center justify-between'>
 									<div className='w-64 h-64'>
 										<Doughnut
-											data={{
-												labels: ['Toʻlangan', 'Toʻlanmagan'],
-												datasets: [
-													{
-														data: [paidPercentage, unpaidPercentage],
-														backgroundColor: ['#0066cc', '#e5e7eb'],
-														borderWidth: 0,
-													},
-												],
-											}}
+											data={doughnutData}
 											options={{
 												responsive: true,
 												maintainAspectRatio: true,
@@ -566,7 +651,7 @@ const Hisobotlar = () => {
 														<div
 															className='h-full bg-blue-600 rounded-full transition-all duration-500'
 															style={{ width: `${course.percentage}%` }}
-														></div>
+														/>
 													</div>
 													<span className='text-sm text-gray-700 w-12 text-right font-medium'>
 														{course.percentage}%
@@ -602,12 +687,17 @@ const Hisobotlar = () => {
 									</tr>
 								</thead>
 								<tbody>
-									{payments.slice(0, 5).map(p => {
+									{paymentsFiltered.slice(0, 5).map(p => {
 										const student = students.find(
-											s => s.student_id === p.paid_student_id
+											s =>
+												s.student_id === p.paid_student_id ||
+												s._id === p.paid_student_id
 										)
 										return (
-											<tr key={p._id} className='border-b border-gray-100'>
+											<tr
+												key={p._id || Math.random()}
+												className='border-b border-gray-100'
+											>
 												<td className='py-4 px-4 text-sm text-gray-900'>
 													{student
 														? `${student.name} ${student.surname}`
@@ -617,9 +707,9 @@ const Hisobotlar = () => {
 													{formatCurrency(p.amount)}
 												</td>
 												<td className='py-4 px-4 text-sm text-gray-500'>
-													{new Date(p.date_Of_Create).toLocaleDateString(
-														'uz-UZ'
-													)}
+													{new Date(
+														p[PAYMENT_DATE_FIELD] || p.date_of_payment || p.date
+													).toLocaleDateString('uz-UZ')}
 												</td>
 											</tr>
 										)
@@ -659,8 +749,7 @@ const Hisobotlar = () => {
 									onClick={exportToCSV}
 									className='px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors'
 								>
-									<Download className='w-4 h-4' />
-									Export
+									<Download className='w-4 h-4' /> Export
 								</button>
 							</div>
 						</div>
@@ -766,22 +855,29 @@ const Hisobotlar = () => {
 								</tr>
 							</thead>
 							<tbody className='divide-y divide-gray-100'>
-								{payments.map(p => {
+								{(paymentsFiltered || []).map(p => {
 									const student = students.find(
-										s => s.student_id === p.paid_student_id
+										s =>
+											s.student_id === p.paid_student_id ||
+											s._id === p.paid_student_id
 									)
 									return (
-										<tr key={p._id} className='hover:bg-gray-50'>
+										<tr
+											key={p._id || Math.random()}
+											className='hover:bg-gray-50'
+										>
 											<td className='px-6 py-4 text-sm text-gray-900'>
 												{student
-													? `${student.name} ${student.surname}`
+													? `${student.name || ''} ${student.surname || ''}`
 													: p.paid_student_id}
 											</td>
 											<td className='px-6 py-4 text-sm text-gray-900'>
 												{formatCurrency(p.amount)}
 											</td>
 											<td className='px-6 py-4 text-sm text-gray-500'>
-												{new Date(p.date_Of_Create).toLocaleDateString('uz-UZ')}
+												{new Date(
+													p[PAYMENT_DATE_FIELD] || p.date_of_payment || p.date
+												).toLocaleDateString('uz-UZ')}
 											</td>
 										</tr>
 									)

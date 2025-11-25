@@ -1,43 +1,40 @@
 import React, { useState, useEffect } from 'react'
 import {
 	Search,
-	Filter,
 	Plus,
 	Eye,
 	Edit,
 	Trash2,
-	FileText,
-	Download,
-	Upload,
 	Users,
 	UserCheck,
 	AlertTriangle,
 	CreditCard,
-	RefreshCw,
+	Snowflake,
+	Unlock,
+	Download,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '../../redux/authSlice'
 import * as XLSX from 'xlsx'
 
-// Основной компонент для управления студентами
 const Oquvchilar = () => {
 	const navigate = useNavigate()
 	const dispatch = useDispatch()
 	const token = useSelector(state => state.auth.accessToken)
 
-	// Состояния компонента
 	const [students, setStudents] = useState([])
+	const [groups, setGroups] = useState([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState('')
-	const [searchTerm, setSearchTerm] = useState('')
-	const [showFilter, setShowFilter] = useState(false)
 	const [showImportExport, setShowImportExport] = useState(false)
+	const [searchTerm, setSearchTerm] = useState('')
 	const [selectedStudents, setSelectedStudents] = useState(new Set())
 	const [showCreate, setShowCreate] = useState(false)
 	const [showUpdate, setShowUpdate] = useState(false)
 	const [showDetails, setShowDetails] = useState(false)
 	const [selectedStudent, setSelectedStudent] = useState(null)
+
 	const [form, setForm] = useState({
 		name: '',
 		surname: '',
@@ -49,8 +46,10 @@ const Oquvchilar = () => {
 		group_attached: true,
 		password: '',
 		id: '',
+		group_id: '', // group.group_id (string)
 		student_id: '',
 	})
+
 	const [createForm, setCreateForm] = useState({
 		name: '',
 		surname: '',
@@ -61,10 +60,22 @@ const Oquvchilar = () => {
 		note: '',
 		group_attached: true,
 		password: '',
+		group_id: '', // group.group_id (string)
+		imgURL:
+			'https://tse3.mm.bing.net/th/id/OIP.5B1_LC815QuZADs1Xf8HdgHaHa?cb=thvnextc1&rs=1&pid=ImgDetMain&o=7&rm=3', // default like your example
 	})
+
 	const [updateMessage, setUpdateMessage] = useState({ text: '', type: '' })
 
-	// Функция для получения списка студентов с API
+	const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+
+	const authGuard = response => {
+		if (response.status === 401) {
+			dispatch(logout())
+			navigate('/login')
+		}
+	}
+
 	const fetchStudents = async () => {
 		if (!token) {
 			setError('No authentication token found. Please log in.')
@@ -73,39 +84,28 @@ const Oquvchilar = () => {
 			navigate('/login')
 			return
 		}
-
 		try {
 			setLoading(true)
 			setError('')
-			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/students',
-				{
-					method: 'GET',
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-					},
-				}
-			)
-
+			const response = await fetch(`${API_BASE}/students`, {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+			})
 			if (!response.ok) {
+				authGuard(response)
 				const errorMessages = {
-					401: 'Authentication failed. Please log in again.',
 					403: 'You do not have permission to access this resource.',
 					500: 'Server error. Please try again later.',
-				}
-				if (response.status === 401) {
-					dispatch(logout())
-					navigate('/login')
 				}
 				throw new Error(
 					errorMessages[response.status] ||
 						`HTTP error! Status: ${response.status}`
 				)
 			}
-
 			const data = await response.json()
-			console.log('Fetched students:', data)
 			setStudents(Array.isArray(data) ? data : [])
 		} catch (err) {
 			console.error('Fetch error:', err)
@@ -115,48 +115,58 @@ const Oquvchilar = () => {
 		}
 	}
 
-	// Загрузка студентов при монтировании компонента
+	const fetchGroups = async () => {
+		if (!token) return
+		try {
+			const response = await fetch(`${API_BASE}/groups`, {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+			})
+			if (!response.ok) {
+				authGuard(response)
+				throw new Error('Guruhlarni yuklashda xato')
+			}
+			const data = await response.json()
+			setGroups(Array.isArray(data) ? data : [])
+		} catch (err) {
+			console.error('Group fetch error:', err)
+		}
+	}
+
 	useEffect(() => {
 		fetchStudents()
+		fetchGroups()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [token])
 
-	// Подсчет статистики
 	const totalStudents = students.length
 	const activeStudents = students.filter(student => student.active).length
-	const noGroupStudents = students.filter(student => !student.group).length
-	const debtors = students.filter(student =>
-		student.balance?.includes('-')
+	const noGroupStudents = students.filter(
+		student => (student.groups?.length || 0) === 0
 	).length
+	const debtors = students.filter(student => student.paid === false).length
 
-	// Выбор всех студентов
 	const handleSelectAll = e => {
-		if (e.target.checked) {
-			setSelectedStudents(new Set(students.map(s => s._id)))
-		} else {
-			setSelectedStudents(new Set())
-		}
+		if (e.target.checked) setSelectedStudents(new Set(students.map(s => s._id)))
+		else setSelectedStudents(new Set())
 	}
 
-	// Выбор одного студента
 	const handleSelectStudent = id => {
-		const newSelected = new Set(selectedStudents)
-		if (newSelected.has(id)) {
-			newSelected.delete(id)
-		} else {
-			newSelected.add(id)
-		}
-		setSelectedStudents(newSelected)
+		const next = new Set(selectedStudents)
+		next.has(id) ? next.delete(id) : next.add(id)
+		setSelectedStudents(next)
 	}
 
-	// Фильтрация студентов по поисковому запросу
 	const filteredStudents = students.filter(
-		student =>
-			student.name?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
-			student.surname?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
-			student.student_phone?.includes(searchTerm)
+		s =>
+			s.name?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
+			s.surname?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
+			s.student_phone?.includes(searchTerm)
 	)
 
-	// Удаление студента
 	const handleDelete = async studentId => {
 		if (!token) {
 			setError('No authentication token found. Please log in.')
@@ -164,51 +174,71 @@ const Oquvchilar = () => {
 			navigate('/login')
 			return
 		}
-
 		try {
-			const response = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/students/${studentId}`,
-				{
-					method: 'DELETE',
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-					},
-				}
-			)
-
+			const response = await fetch(`${API_BASE}/students/${studentId}`, {
+				method: 'DELETE',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+			})
 			if (!response.ok) {
+				authGuard(response)
+				const errorData = await safeJson(response)
 				const errorMessages = {
-					401: 'Authentication failed. Please log in again.',
 					403: 'You do not have permission to access this resource.',
 					500: 'Server error. Please try again later.',
 				}
-				if (response.status === 401) {
-					dispatch(logout())
-					navigate('/login')
-				}
-				const errorData = await response.json()
 				throw new Error(
-					errorData.message ||
+					errorData?.message ||
 						errorMessages[response.status] ||
 						'Serverdan xatolik.'
 				)
 			}
-
-			setStudents(prev => prev.filter(student => student._id !== studentId))
+			setStudents(prev =>
+				prev.filter(s => s._id !== studentId && s.student_id !== studentId)
+			)
 			setSelectedStudents(prev => {
-				const newSet = new Set(prev)
-				newSet.delete(studentId)
-				return newSet
+				const ns = new Set(prev)
+				ns.delete(studentId)
+				return ns
 			})
-			fetchStudents()
 		} catch (err) {
 			console.error('Delete error:', err)
 			setError(err.message || "O'quvchi o'chirishda xato")
 		}
 	}
 
-	// Подготовка данных для редактирования студента
+	const safeJson = async res => {
+		try {
+			return await res.json()
+		} catch {
+			return null
+		}
+	}
+
+	// ====== helpers to read server error text when JSON not provided
+	const readErrorMessage = async response => {
+		let serverMsg = ''
+		try {
+			// try json first
+			const asJson = await response.clone().json()
+			if (asJson && (asJson.message || asJson.error)) {
+				serverMsg = asJson.message || asJson.error
+			}
+		} catch {
+			try {
+				// then try text
+				const asText = await response.text()
+				if (asText) serverMsg = asText
+			} catch {
+				/* ignore */
+			}
+		}
+		return serverMsg
+	}
+
+	// === EDIT (fill modal only)
 	const handleEdit = student => {
 		if (!student._id) {
 			setUpdateMessage({ text: 'Invalid student ID', type: 'error' })
@@ -219,7 +249,7 @@ const Oquvchilar = () => {
 			surname: student.surname || '',
 			student_phone: student.student_phone || '',
 			parents_phone: student.parents_phone || '',
-			birth_date: student.birth_date || '',
+			birth_date: (student.birth_date || '').slice(0, 10),
 			gender: student.gender || '',
 			note: student.note || '',
 			group_attached:
@@ -227,12 +257,204 @@ const Oquvchilar = () => {
 			password: '',
 			id: student._id || '',
 			student_id: student.student_id || '',
+			group_id:
+				student.groups && student.groups.length > 0
+					? String(student.groups[0])
+					: '',
 		})
 		setUpdateMessage({ text: '', type: '' })
 		setShowUpdate(true)
 	}
 
-	// Обновление студента
+	// === Freeze / Unfreeze
+	const handleMuzlatish = async id => {
+		if (!token) {
+			setError('No authentication token found. Please log in.')
+			dispatch(logout())
+			navigate('/login')
+			return
+		}
+		try {
+			setError('')
+			const res = await fetch(`${API_BASE}/students/${id}`, {
+				method: 'PUT',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ status: 'muzlagan' }),
+			})
+			if (!res.ok) {
+				authGuard(res)
+				const serverMsg = await readErrorMessage(res)
+				throw new Error(serverMsg || 'HTTP ' + res.status)
+			}
+			setStudents(prev =>
+				prev.map(s =>
+					s.student_id === id || s._id === id ? { ...s, status: 'muzlagan' } : s
+				)
+			)
+		} catch (e) {
+			console.error('Freeze error:', e)
+			setError(e.message || "Holatni o'zgartirishda xato")
+		}
+	}
+
+	const deleteMuzlatish = async id => {
+		if (!token) {
+			setError('No authentication token found. Please log in.')
+			dispatch(logout())
+			navigate('/login')
+			return
+		}
+		try {
+			setError('')
+			const res = await fetch(`${API_BASE}/students/${id}`, {
+				method: 'PUT',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ status: 'active' }),
+			})
+			if (!res.ok) {
+				authGuard(res)
+				const serverMsg = await readErrorMessage(res)
+				throw new Error(serverMsg || 'HTTP ' + res.status)
+			}
+			setStudents(prev =>
+				prev.map(s =>
+					s.student_id === id || s._id === id ? { ...s, status: 'active' } : s
+				)
+			)
+		} catch (e) {
+			console.error('Unfreeze error:', e)
+			setError(e.message || "Holatni o'zgartirishda xato")
+		}
+	}
+
+	// === CREATE (payload exactly like your sample)
+	const handleCreate = async () => {
+		const {
+			name,
+			surname,
+			student_phone,
+			birth_date,
+			gender,
+			password,
+			parents_phone,
+			note,
+			group_attached,
+			group_id,
+			imgURL,
+		} = createForm
+
+		if (
+			!name?.trim() ||
+			!surname?.trim() ||
+			!student_phone?.trim() ||
+			!birth_date?.trim() ||
+			!gender?.trim() ||
+			!password?.trim()
+		) {
+			setUpdateMessage({
+				text: "Iltimos, barcha majburiy maydonlarni to'ldiring (Ism, Familiya, Telefon raqami, Tug'ilgan sana, Jins, Parol)",
+				type: 'error',
+			})
+			return
+		}
+		const phoneRegex = /^\+998\d{9}$/
+		if (!phoneRegex.test(student_phone)) {
+			setUpdateMessage({
+				text: "Telefon raqami +998 bilan boshlanib, 9 ta raqamdan iborat bo'lishi kerak",
+				type: 'error',
+			})
+			return
+		}
+		if (!token) {
+			setUpdateMessage({
+				text: 'No authentication token found. Please log in.',
+				type: 'error',
+			})
+			dispatch(logout())
+			navigate('/login')
+			return
+		}
+
+		try {
+			const payload = {
+				// EXACTLY like your sample body:
+				name: name.trim(),
+				surname: surname.trim(),
+				student_phone: student_phone.trim(),
+				parents_phone: parents_phone?.trim() || undefined,
+				birth_date: birth_date.trim(), // YYYY-MM-DD
+				gender: gender.trim(),
+				note: note?.trim() || undefined,
+				group_attached: !!group_attached,
+				groups: group_id ? [String(group_id)] : [],
+				password: password.trim(),
+				paid: false,
+				status: 'active',
+				imgURL:
+					imgURL?.trim() ||
+					'https://tse3.mm.bing.net/th/id/OIP.5B1_LC815QuZADs1Xf8HdgHaHa?cb=thvnextc1&rs=1&pid=ImgDetMain&o=7&rm=3',
+
+				// extra fields (har ehtimolga) — many backends still expect these:
+				balance: '0',
+				coinbalance: '0',
+				teachers: [],
+			}
+
+			const response = await fetch(`${API_BASE}/students`, {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(payload),
+			})
+
+			if (!response.ok) {
+				authGuard(response)
+				const serverMsg = await readErrorMessage(response)
+				throw new Error(serverMsg || 'Ошибка при создании студента')
+			}
+
+			setUpdateMessage({
+				text: "O'quvchi muvaffaqiyatli qo'shildi!",
+				type: 'success',
+			})
+			setTimeout(() => {
+				setShowCreate(false)
+				setUpdateMessage({ text: '', type: '' })
+			}, 800)
+			fetchStudents()
+
+			setCreateForm({
+				name: '',
+				surname: '',
+				student_phone: '',
+				parents_phone: '',
+				birth_date: '',
+				gender: '',
+				note: '',
+				group_attached: true,
+				password: '',
+				group_id: '',
+				imgURL:
+					'https://tse3.mm.bing.net/th/id/OIP.5B1_LC815QuZADs1Xf8HdgHaHa?cb=thvnextc1&rs=1&pid=ImgDetMain&o=7&rm=3',
+			})
+		} catch (err) {
+			console.error('Create error:', err)
+			setUpdateMessage({
+				text: err.message || "O'quvchi qo'shishda xato",
+				type: 'error',
+			})
+		}
+	}
+
+	// === UPDATE
 	const handleUpdate = async () => {
 		const {
 			student_id,
@@ -245,6 +467,7 @@ const Oquvchilar = () => {
 			note,
 			password,
 			group_attached,
+			group_id,
 		} = form
 
 		if (
@@ -261,8 +484,6 @@ const Oquvchilar = () => {
 			})
 			return
 		}
-
-		// Validate phone number format
 		const phoneRegex = /^\+998\d{9}$/
 		if (!phoneRegex.test(student_phone)) {
 			setUpdateMessage({
@@ -271,59 +492,43 @@ const Oquvchilar = () => {
 			})
 			return
 		}
+		if (!token) {
+			setUpdateMessage({
+				text: 'Token topilmadi. Iltimos, qayta kiring.',
+				type: 'error',
+			})
+			dispatch(logout())
+			navigate('/login')
+			return
+		}
 
 		try {
-			if (!token) {
-				setUpdateMessage({
-					text: 'Token topilmadi. Iltimos, qayta kiring.',
-					type: 'error',
-				})
-				dispatch(logout())
-				navigate('/')
-				return
-			}
-
 			const payload = {
-				student_id: student_id?.trim(),
-				name: name?.trim(),
-				surname: surname?.trim(),
-				student_phone: student_phone?.trim(),
+				name: name.trim(),
+				surname: surname.trim(),
+				student_phone: student_phone.trim(),
 				parents_phone: parents_phone?.trim() || undefined,
-				birth_date: birth_date?.trim(),
-				gender: gender?.trim(),
+				birth_date: birth_date.trim(),
+				gender: gender.trim(),
 				note: note?.trim() || undefined,
-				group_attached: group_attached,
+				group_attached: !!group_attached,
 			}
-			if (password?.trim()) {
-				payload.password = password.trim()
-			}
+			if (password?.trim()) payload.password = password.trim()
+			if (group_id) payload.groups = [String(group_id)]
 
-			const response = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/students/${student_id}`,
-				{
-					method: 'PUT',
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify(payload),
-				}
-			)
+			const response = await fetch(`${API_BASE}/students/${student_id}`, {
+				method: 'PUT',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(payload),
+			})
 
 			if (!response.ok) {
-				const errorData = await response.json()
-				const errorMessages = {
-					401: 'Authentication failed. Please log in again.',
-					403: 'You do not have permission to access this resource.',
-					500: 'Server error. Please try again later.',
-				}
-				if (response.status === 401) {
-					dispatch(logout())
-					navigate('/login')
-				}
-				throw new Error(
-					errorData.message || errorMessages[response.status] || "Noma'lum xato"
-				)
+				authGuard(response)
+				const serverMsg = await readErrorMessage(response)
+				throw new Error(serverMsg || "Noma'lum xato")
 			}
 
 			setUpdateMessage({
@@ -333,8 +538,8 @@ const Oquvchilar = () => {
 			setTimeout(() => {
 				setShowUpdate(false)
 				setUpdateMessage({ text: '', type: '' })
-				fetchStudents()
-			}, 2000)
+			}, 800)
+			fetchStudents()
 		} catch (err) {
 			setUpdateMessage({
 				text: err.message || 'Yangilashda xatolik yuz berdi',
@@ -343,124 +548,6 @@ const Oquvchilar = () => {
 		}
 	}
 
-	// Создание нового студента
-	const handleCreate = async () => {
-		const {
-			name,
-			surname,
-			student_phone,
-			birth_date,
-			gender,
-			password,
-			parents_phone,
-			note,
-			group_attached,
-		} = createForm
-
-		if (
-			!name.trim() ||
-			!surname.trim() ||
-			!student_phone.trim() ||
-			!birth_date.trim() ||
-			!gender.trim() ||
-			!password.trim()
-		) {
-			setUpdateMessage({
-				text: "Iltimos, barcha majburiy maydonlarni to'ldiring (Ism, Familiya, Telefon raqami, Tug'ilgan sana, Jins, Parol)",
-				type: 'error',
-			})
-			return
-		}
-
-		const phoneRegex = /^\+998\d{9}$/
-		if (!phoneRegex.test(student_phone)) {
-			setUpdateMessage({
-				text: "Telefon raqami +998 bilan boshlanib, 9 ta raqamdan iborat bo'lishi kerak",
-				type: 'error',
-			})
-			return
-		}
-
-		try {
-			if (!token) {
-				setUpdateMessage({
-					text: 'No authentication token found. Please log in.',
-					type: 'error',
-				})
-				dispatch(logout())
-				navigate('/login')
-				return
-			}
-
-			const payload = {
-				name: name.trim(),
-				surname: surname.trim(),
-				student_phone: student_phone.trim(),
-				parents_phone: parents_phone.trim() || undefined,
-				birth_date: birth_date.trim(),
-				gender: gender.trim(),
-				note: note.trim() || undefined,
-				group_attached: group_attached,
-				password: password.trim(),
-			}
-
-			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/students',
-				{
-					method: 'POST',
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify(payload),
-				}
-			)
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				const errorMessages = {
-					401: 'Authentication failed. Please log in again.',
-					403: 'You do not have permission to access this resource.',
-					500: 'Server error. Please try again later.',
-				}
-				if (response.status === 401) {
-					dispatch(logout())
-					navigate('/login')
-				}
-				throw new Error(
-					errorData.message || errorMessages[response.status] || 'Unknown error'
-				)
-			}
-
-			const newStudent = await response.json()
-			setStudents(prev => [...prev, newStudent])
-			setCreateForm({
-				name: '',
-				surname: '',
-				student_phone: '',
-				parents_phone: '',
-				birth_date: '',
-				gender: '',
-				note: '',
-				group_attached: true,
-				password: '',
-			})
-			setShowCreate(false)
-			setUpdateMessage({
-				text: "O'quvchi muvaffaqiyatli qo'shildi!",
-				type: 'success',
-			})
-			setTimeout(() => setUpdateMessage({ text: '', type: '' }), 2000)
-		} catch (err) {
-			console.error('Create error:', err)
-			setUpdateMessage({
-				text: err.message || "O'quvchi qo'shishda xato",
-				type: 'error',
-			})
-		}
-	}
-
-	// Просмотр деталей студента
 	const handleViewDetails = student => {
 		if (!student._id) {
 			setUpdateMessage({ text: 'Invalid student ID', type: 'error' })
@@ -470,7 +557,6 @@ const Oquvchilar = () => {
 		setShowDetails(true)
 	}
 
-	// Экспорт в Excel
 	const handleExportExcel = () => {
 		try {
 			const dataToExport = filteredStudents.map((student, index) => ({
@@ -481,21 +567,18 @@ const Oquvchilar = () => {
 				'Ota-ona telefoni': student.parents_phone || '',
 				"Tug'ilgan sana": student.birth_date || '',
 				Jinsi: student.gender || '',
-				Guruh: student.group || 'Guruhsiz',
+				Guruh: (student.groups?.length || 0) > 0 ? 'Guruhda' : 'Guruhsiz',
 				Balans: student.balance || '0 UZS',
 				Holati: student.active ? 'Faol' : 'Nofaol',
 				Eslatma: student.note || '',
 			}))
-
 			const worksheet = XLSX.utils.json_to_sheet(dataToExport)
 			const workbook = XLSX.utils.book_new()
 			XLSX.utils.book_append_sheet(workbook, worksheet, "O'quvchilar")
-
 			const fileName = `oquvchilar_${
 				new Date().toISOString().split('T')[0]
 			}.xlsx`
 			XLSX.writeFile(workbook, fileName)
-
 			setUpdateMessage({
 				text: 'Excel fayl muvaffaqiyatli yuklab olindi!',
 				type: 'success',
@@ -512,48 +595,6 @@ const Oquvchilar = () => {
 		setShowImportExport(false)
 	}
 
-	// Импорт из Excel
-	const handleImportExcel = async event => {
-		const file = event.target.files[0]
-		if (!file) return
-
-		try {
-			const data = await file.arrayBuffer()
-			const workbook = XLSX.read(data)
-			const sheetName = workbook.SheetNames[0]
-			const worksheet = workbook.Sheets[sheetName]
-			const jsonData = XLSX.utils.sheet_to_json(worksheet)
-
-			if (jsonData.length === 0) {
-				setUpdateMessage({
-					text: "Excel faylida ma'lumotlar topilmadi",
-					type: 'error',
-				})
-				setTimeout(() => setUpdateMessage({ text: '', type: '' }), 3000)
-				return
-			}
-
-			// Process imported data - you can implement full import logic here
-			console.log('Imported data:', jsonData)
-
-			setUpdateMessage({
-				text: `${jsonData.length} ta qator import qilindi. To'liq import funksiyasi qo'shilishi kerak.`,
-				type: 'success',
-			})
-			setTimeout(() => setUpdateMessage({ text: '', type: '' }), 3000)
-		} catch (error) {
-			console.error('Import error:', error)
-			setUpdateMessage({
-				text: 'Excel import qilishda xatolik yuz berdi',
-				type: 'error',
-			})
-			setTimeout(() => setUpdateMessage({ text: '', type: '' }), 3000)
-		}
-
-		event.target.value = ''
-		setShowImportExport(false)
-	}
-
 	return (
 		<div className='min-h-screen bg-gray-50'>
 			{/* Header */}
@@ -563,24 +604,22 @@ const Oquvchilar = () => {
 					<div className='text-sm text-gray-500'>O'quvchilar</div>
 				</div>
 
-				{/* Success/Error Message */}
-				{updateMessage.text && (
-					<div
-						className={`mt-4 p-4 rounded-lg text-sm ${
-							updateMessage.type === 'error'
-								? 'bg-red-50 border border-red-200 text-red-700'
-								: 'bg-green-50 border border-green-200 text-green-700'
-						}`}
-					>
-						{updateMessage.text}
-					</div>
-				)}
-
-				{/* Модальное окно для создания студента */}
+				{/* CREATE MODAL */}
 				{showCreate && (
 					<div className='fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50'>
 						<div className='bg-white p-6 rounded-xl shadow-xl w-96 max-h-[90vh] overflow-y-auto'>
 							<h2 className='text-xl font-semibold mb-4'>O'quvchi Qo'shish</h2>
+							{updateMessage.text && (
+								<div
+									className={`mb-4 p-3 rounded-lg text-sm ${
+										updateMessage.type === 'error'
+											? 'bg-red-100 text-red-700'
+											: 'bg-green-100 text-green-700'
+									}`}
+								>
+									{updateMessage.text}
+								</div>
+							)}
 							<input
 								type='text'
 								placeholder='Ism *'
@@ -643,6 +682,23 @@ const Oquvchilar = () => {
 								<option value='Erkak'>Erkak</option>
 								<option value='Ayol'>Ayol</option>
 							</select>
+
+							{/* Always use group.group_id */}
+							<select
+								className='w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500'
+								value={createForm.group_id}
+								onChange={e =>
+									setCreateForm({ ...createForm, group_id: e.target.value })
+								}
+							>
+								<option value=''>Guruhni tanlang (ixtiyoriy)</option>
+								{groups.map(group => (
+									<option key={group._id} value={group.group_id}>
+										{group.name}
+									</option>
+								))}
+							</select>
+
 							<input
 								type='text'
 								placeholder='Eslatma (ixtiyoriy)'
@@ -652,6 +708,18 @@ const Oquvchilar = () => {
 									setCreateForm({ ...createForm, note: e.target.value })
 								}
 							/>
+
+							{/* NEW: imgURL to match your sample */}
+							<input
+								type='text'
+								placeholder='Rasm URL (ixtiyoriy)'
+								className='w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500'
+								value={createForm.imgURL}
+								onChange={e =>
+									setCreateForm({ ...createForm, imgURL: e.target.value })
+								}
+							/>
+
 							<input
 								type='password'
 								placeholder='Parol *'
@@ -661,6 +729,7 @@ const Oquvchilar = () => {
 									setCreateForm({ ...createForm, password: e.target.value })
 								}
 							/>
+
 							<div className='flex justify-end gap-3'>
 								<button
 									onClick={() => {
@@ -674,8 +743,12 @@ const Oquvchilar = () => {
 											note: '',
 											group_attached: true,
 											password: '',
+											group_id: '',
+											imgURL:
+												'https://tse3.mm.bing.net/th/id/OIP.5B1_LC815QuZADs1Xf8HdgHaHa?cb=thvnextc1&rs=1&pid=ImgDetMain&o=7&rm=3',
 										})
 										setShowCreate(false)
+										setUpdateMessage({ text: '', type: '' })
 									}}
 									className='px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200'
 								>
@@ -692,13 +765,24 @@ const Oquvchilar = () => {
 					</div>
 				)}
 
-				{/* Модальное окно для обновления студента */}
+				{/* UPDATE MODAL */}
 				{showUpdate && (
 					<div className='fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50'>
 						<div className='bg-white p-6 rounded-xl shadow-xl w-96 max-h-[90vh] overflow-y-auto'>
 							<h2 className='text-xl font-semibold mb-4'>
 								O'quvchi ma'lumotlarini yangilash
 							</h2>
+							{updateMessage.text && (
+								<div
+									className={`mb-4 p-3 rounded-lg text-sm ${
+										updateMessage.type === 'error'
+											? 'bg-red-100 text-red-700'
+											: 'bg-green-100 text-green-700'
+									}`}
+								>
+									{updateMessage.text}
+								</div>
+							)}
 							<input
 								type='text'
 								placeholder='Ism *'
@@ -738,15 +822,20 @@ const Oquvchilar = () => {
 								value={form.birth_date}
 								onChange={e => setForm({ ...form, birth_date: e.target.value })}
 							/>
+
 							<select
 								className='w-full border border-gray-300 p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500'
-								value={form.gender}
-								onChange={e => setForm({ ...form, gender: e.target.value })}
+								value={form.group_id}
+								onChange={e => setForm({ ...form, group_id: e.target.value })}
 							>
-								<option value=''>Jinsni tanlang *</option>
-								<option value='Erkak'>Erkak</option>
-								<option value='Ayol'>Ayol</option>
+								<option value=''>Guruhni tanlang (ixtiyoriy)</option>
+								{groups.map(group => (
+									<option key={group._id} value={group.group_id}>
+										{group.name}
+									</option>
+								))}
 							</select>
+
 							<input
 								type='text'
 								placeholder='Eslatma (ixtiyoriy)'
@@ -761,6 +850,7 @@ const Oquvchilar = () => {
 								value={form.password}
 								onChange={e => setForm({ ...form, password: e.target.value })}
 							/>
+
 							<div className='flex justify-end gap-3'>
 								<button
 									onClick={() => {
@@ -776,8 +866,10 @@ const Oquvchilar = () => {
 											password: '',
 											id: '',
 											student_id: '',
+											group_id: '',
 										})
 										setShowUpdate(false)
+										setUpdateMessage({ text: '', type: '' })
 									}}
 									className='px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200'
 								>
@@ -794,7 +886,7 @@ const Oquvchilar = () => {
 					</div>
 				)}
 
-				{/* Модальное окно для просмотра деталей студента */}
+				{/* DETAILS MODAL */}
 				{showDetails && selectedStudent && (
 					<div className='fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50'>
 						<div className='bg-white p-6 rounded-xl shadow-xl w-96 max-h-[90vh] overflow-y-auto'>
@@ -826,6 +918,15 @@ const Oquvchilar = () => {
 										</span>
 									</p>
 									<p className='text-sm'>
+										<span className='font-medium text-gray-700'>
+											Tug'ilgan sana:
+										</span>{' '}
+										<span className='text-gray-600'>
+											{(selectedStudent.birth_date || '').slice(0, 10) ||
+												'Kiritilmagan'}
+										</span>
+									</p>
+									<p className='text-sm'>
 										<span className='font-medium text-gray-700'>Jinsi:</span>{' '}
 										<span className='text-gray-600'>
 											{selectedStudent.gender || 'Kiritilmagan'}
@@ -834,7 +935,9 @@ const Oquvchilar = () => {
 									<p className='text-sm'>
 										<span className='font-medium text-gray-700'>Guruh:</span>{' '}
 										<span className='text-blue-600 text-sm'>
-											{selectedStudent.group || 'Guruhsiz'}
+											{(selectedStudent.groups?.length || 0) > 0
+												? 'Guruhda'
+												: 'Guruhsiz'}
 										</span>
 									</p>
 									<p className='text-sm'>
@@ -853,12 +956,12 @@ const Oquvchilar = () => {
 										<span className='font-medium text-gray-700'>Holati:</span>{' '}
 										<span
 											className={
-												selectedStudent.active
+												selectedStudent.status === 'active'
 													? 'text-green-600 font-medium'
 													: 'text-red-600 font-medium'
 											}
 										>
-											{selectedStudent.active ? 'Faol' : 'Nofaol'}
+											{selectedStudent.status}
 										</span>
 									</p>
 									{selectedStudent.note && (
@@ -886,10 +989,9 @@ const Oquvchilar = () => {
 				)}
 			</div>
 
-			{/* Статистика */}
+			{/* Stats */}
 			<div className='p-6'>
 				<div className='grid grid-cols-4 gap-4 mb-6'>
-					{/* Общее количество студентов */}
 					<div className='bg-white rounded-lg p-6 border-l-4 border-blue-500 shadow-sm'>
 						<div className='flex items-center justify-between'>
 							<div>
@@ -905,8 +1007,6 @@ const Oquvchilar = () => {
 							</div>
 						</div>
 					</div>
-
-					{/* Активные студенты */}
 					<div className='bg-white rounded-lg p-6 border-l-4 border-cyan-500 shadow-sm'>
 						<div className='flex items-center justify-between'>
 							<div>
@@ -922,8 +1022,6 @@ const Oquvchilar = () => {
 							</div>
 						</div>
 					</div>
-
-					{/* Студенты без группы */}
 					<div className='bg-white rounded-lg p-6 border-l-4 border-orange-500 shadow-sm'>
 						<div className='flex items-center justify-between'>
 							<div>
@@ -939,8 +1037,6 @@ const Oquvchilar = () => {
 							</div>
 						</div>
 					</div>
-
-					{/* Должники */}
 					<div className='bg-white rounded-lg p-6 border-l-4 border-red-500 shadow-sm'>
 						<div className='flex items-center justify-between'>
 							<div>
@@ -958,12 +1054,11 @@ const Oquvchilar = () => {
 					</div>
 				</div>
 
-				{/* Панель действий */}
+				{/* Actions */}
 				<div className='flex items-center justify-between mb-6'>
 					<div className='flex items-center space-x-3'>
-						{/* Поиск */}
 						<div className='relative'>
-							<Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
+							<Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4' />
 							<input
 								type='text'
 								placeholder='Qidirish ...'
@@ -973,23 +1068,12 @@ const Oquvchilar = () => {
 							/>
 						</div>
 
-						{/* Фильтр */}
-						<button
-							onClick={() => setShowFilter(!showFilter)}
-							className='flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500'
-						>
-							<Filter className='w-4 h-4 text-gray-500' />
-							Filter
-						</button>
-
-						{/* Импорт/Экспорт */}
 						<div className='relative'>
 							<button
 								onClick={() => setShowImportExport(!showImportExport)}
 								className='flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
 							>
-								<Download className='w-4 h-4' />
-								Import/Export
+								<Download className='w-4 h-4' /> Import/Export
 								<svg
 									className='w-4 h-4'
 									fill='currentColor'
@@ -1002,57 +1086,30 @@ const Oquvchilar = () => {
 									/>
 								</svg>
 							</button>
-
 							{showImportExport && (
 								<div className='absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10'>
-									<input
-										type='file'
-										accept='.xlsx,.xls'
-										onChange={handleImportExcel}
-										style={{ display: 'none' }}
-										id='excel-upload'
-									/>
-									<button
-										onClick={() =>
-											document.getElementById('excel-upload').click()
-										}
-										className='flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
-									>
-										<Upload className='w-4 h-4' />
-										Import Excel
-									</button>
 									<button
 										onClick={handleExportExcel}
 										className='flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
 									>
-										<Download className='w-4 h-4' />
-										Export Excel
+										<Download className='w-4 h-4' /> Export Excel
 									</button>
 								</div>
 							)}
 						</div>
 					</div>
 
-					{/* Кнопки действий */}
 					<div className='flex items-center gap-3'>
-						<button
-							onClick={fetchStudents}
-							className='flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'
-						>
-							<RefreshCw className='w-4 h-4' />
-							Yangilash
-						</button>
 						<button
 							onClick={() => setShowCreate(true)}
 							className='flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500'
 						>
-							<Plus className='w-4 h-4' />
-							O'quvchi qo'shish
+							<Plus className='w-4 h-4' /> O'quvchi qo'shish
 						</button>
 					</div>
 				</div>
 
-				{/* Ошибка с кнопкой повторной попытки */}
+				{/* Error */}
 				{error && (
 					<div className='bg-red-50 border border-red-200 text-red-700 px-6 py-4 mb-6 rounded-lg flex items-center justify-between'>
 						<span>{error}</span>
@@ -1065,9 +1122,8 @@ const Oquvchilar = () => {
 					</div>
 				)}
 
-				{/* Таблица студентов */}
+				{/* Table */}
 				<div className='bg-white rounded-lg shadow-sm overflow-hidden'>
-					{/* Заголовок таблицы */}
 					<div className='bg-gray-50 px-6 py-3 border-b border-gray-200'>
 						<div className='grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider'>
 							<div className='flex items-center'>
@@ -1091,7 +1147,6 @@ const Oquvchilar = () => {
 						</div>
 					</div>
 
-					{/* Тело таблицы */}
 					<div className='divide-y divide-gray-100'>
 						{loading ? (
 							<div className='text-center py-8'>
@@ -1106,10 +1161,13 @@ const Oquvchilar = () => {
 							filteredStudents.map((student, idx) => (
 								<div
 									key={student._id || idx}
-									className='px-6 py-4 hover:bg-gray-50 transition-colors'
+									className={
+										student.status === 'muzlagan'
+											? 'px-6 py-4 bg-gray-300 hover:bg-gray-400 transition-colors'
+											: 'px-6 py-4 hover:bg-gray-50 transition-colors'
+									}
 								>
 									<div className='grid grid-cols-12 gap-4 items-center text-sm'>
-										{/* ID с чекбоксом */}
 										<div className='flex items-center'>
 											<input
 												type='checkbox'
@@ -1120,37 +1178,33 @@ const Oquvchilar = () => {
 											<span className='text-gray-900'>{idx + 1}</span>
 										</div>
 
-										{/* Имя с аватаром */}
 										<div className='col-span-3 flex items-center'>
 											<div className='w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-700 mr-3'>
-												{student.name?.charAt(0) || ''}
-												{student.surname?.charAt(0) || ''}
+												{student.name?.charAt(0)}
 											</div>
 											<span className='font-medium text-gray-900'>
 												{student.name} {student.surname}
 											</span>
 										</div>
 
-										{/* Телефон */}
 										<div className='col-span-2 text-gray-600'>
 											{student.student_phone}
 										</div>
 
-										{/* Группа */}
 										<div className='col-span-2'>
 											<span className='text-blue-600 text-sm'>
-												{student.group || 'Guruhsiz'}
+												{(student.groups?.length || 0) > 0
+													? 'Guruhda'
+													: 'Guruhsiz'}
 											</span>
 										</div>
 
-										{/* Филиал */}
 										<div>
 											<span className='px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium'>
 												Asosiy filial
 											</span>
 										</div>
 
-										{/* Баланс */}
 										<div
 											className={`font-medium text-sm ${
 												student.balance?.includes('-')
@@ -1161,35 +1215,48 @@ const Oquvchilar = () => {
 											{student.balance || '0 UZS'}
 										</div>
 
-										{/* Действия */}
 										<div className='flex gap-2 justify-center'>
 											<button
-												className='w-10 h-10 bg-emerald-500 text-white rounded-md hover:bg-emerald-600 flex items-center justify-center transition-colors'
-												title='Hisobot'
-											>
-												<FileText className='w-5 h-5' />
-											</button>
-											<button
 												onClick={() => handleViewDetails(student)}
-												className='w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors'
+												className='w-10 h-10 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center justify-center transition-colors'
 												title="Ko'rish"
+												disabled={student.status === 'muzlagan'}
 											>
-												<Eye className='w-5 h-5' />
+												<Eye className='w-10 h-5' />
 											</button>
 											<button
 												onClick={() => handleEdit(student)}
-												className='w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors'
+												className='w-10 h-10 bg-orange-500 text-white rounded-md hover:bg-orange-600 flex items-center justify-center transition-colors'
 												title='Tahrirlash'
+												disabled={student.status === 'muzlagan'}
 											>
-												<Edit className='w-5 h-5' />
+												<Edit className='w-10 h-5' />
 											</button>
 											<button
 												onClick={() => handleDelete(student.student_id)}
 												className='w-10 h-10 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center transition-colors'
 												title="O'chirish"
+												disabled={student.status === 'muzlagan'}
 											>
-												<Trash2 className='w-5 h-5' />
+												<Trash2 className='w-10 h-5' />
 											</button>
+											{student.status === 'muzlagan' ? (
+												<button
+													onClick={() => deleteMuzlatish(student.student_id)}
+													className='w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors'
+													title='Aktivlashtirish'
+												>
+													<Unlock className='w-10 h-5' />
+												</button>
+											) : (
+												<button
+													onClick={() => handleMuzlatish(student.student_id)}
+													className='w-10 h-10 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center transition-colors'
+													title='Muzlatish'
+												>
+													<Snowflake className='w-10 h-5' />
+												</button>
+											)}
 										</div>
 									</div>
 								</div>

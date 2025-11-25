@@ -2,38 +2,70 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { setCredentials } from '../../redux/authSlice'
 import {
-  Clock, Code, Search, Users, ChevronLeft, Check, X, ChevronDown, Loader2, GraduationCap, User
+	Clock,
+	Code,
+	Search,
+	Users,
+	ChevronLeft,
+	Check,
+	X,
+	ChevronDown,
+	Loader2,
+	GraduationCap,
+	User,
 } from 'lucide-react'
 
 const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
 
 // === Yordamchi funksiyalar ===
-const gid = (g) => String(g?.group_id ?? g?.id ?? g?._id ?? "")
-const sid = (s) => String(s?.student_id ?? s?.studentId ?? s?.id ?? s?._id ?? "")
+const gid = g => String(g?.group_id ?? g?.id ?? g?._id ?? '')
+const sid = s => String(s?.student_id ?? s?.studentId ?? s?.id ?? s?._id ?? '')
 const attKey = (g, s, dateStr) => `${g}:${s}:${dateStr}`
 
-const niceStudent = (s) => {
-  const name = s.full_name || s.fullName || `${s.name || ""} ${s.surname || ""}`.trim() || "Noma'lum"
-  return { ...s, name }
+const niceStudent = s => {
+	const nameParts = [s?.full_name || s?.fullName, s?.name, s?.surname].filter(
+		Boolean
+	)
+	const name = nameParts.join(' ').trim() || "Noma'lum"
+	return { ...s, name }
 }
 
-const getDaysConfig = (g) => {
-  const d = g?.days || {}
-  return { odd: !!d.odd_days, even: !!d.even_days, every: !!d.every_days }
+// NEW CONFIG — weekday-based class rule
+// Mon=1 Tue=2 Wed=3 Thu=4 Fri=5 Sat=6 Sun=0
+const getWeekdayConfig = group => {
+	const days = group?.days || {}
+	return {
+		odd: !!days.odd_days, // Mon, Wed, Fri
+		even: !!days.even_days, // Tue, Thu, Sat
+		every: !!days.every_days,
+	}
 }
-const isClassDay = (dayNumber, group) => {
-  const cfg = getDaysConfig(group)
-  if (cfg.every) return true
-  if (cfg.odd && dayNumber % 2 === 1) return true
-  if (cfg.even && dayNumber % 2 === 0) return true
-  return false
+
+// FIXED — now using weekday instead of date number
+const isClassDay = (dayOfMonth, group) => {
+	const cfg = getWeekdayConfig(group)
+	if (cfg.every) return true
+	const date = new Date(group.selectedYear, group.selectedMonth, dayOfMonth)
+	const weekday = date.getDay() // 0=Sun ... 6=Sat
+	if (cfg.odd && [1, 3, 5].includes(weekday)) return true // Mon Wed Fri
+	if (cfg.even && [2, 4, 6].includes(weekday)) return true // Tue Thu Sat
+	return false
 }
-const daysBadge = (g) => {
-  const cfg = getDaysConfig(g)
-  if (cfg.every) return "Har kuni"
-  if (cfg.odd) return "Toq kunlar"
-  if (cfg.even) return "Juft kunlar"
-  return "—"
+
+const daysBadge = g => {
+	const cfg = getWeekdayConfig(g)
+	if (cfg.every) return 'Har kuni'
+	if (cfg.odd) return 'Toq kunlar (Dush, Chorsh, Jum)'
+	if (cfg.even) return 'Juft kunlar (Sesh, Paysh, Shan)'
+	return '—'
+}
+
+// Helper: build local YYYY-MM-DD from a Date (avoids toISOString timezone shifts)
+const toLocalDateStr = d => {
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+		2,
+		'0'
+	)}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 const Guruhlar = () => {
@@ -77,74 +109,78 @@ const Guruhlar = () => {
 		if (current) setSelectedMonth(current)
 	}, [months])
 
-	// === Oy kunlari (dateStr: YYYY-MM-DD) ===
+	// === Oy kunlari (dateStr: YYYY-MM-DD local) ===
 	const monthDays = useMemo(() => {
 		if (!selectedMonth) return []
 		const y = selectedMonth.year
 		const m = selectedMonth.month
-		return Array.from({ length: new Date(y, m + 1, 0).getDate() }, (_, i) => {
+		const daysInMonth = new Date(y, m + 1, 0).getDate()
+		return Array.from({ length: daysInMonth }, (_, i) => {
 			const day = i + 1
 			const d = new Date(y, m, day)
-			const iso = d.toISOString().split('T')[0]
-			return {
-				day,
-				date: d,
-				dateStr: iso,
-				isToday:
-					day === new Date().getDate() &&
-					m === new Date().getMonth() &&
-					y === new Date().getFullYear(),
-				dateLabel: `${String(day).padStart(2, '0')}.${String(m + 1).padStart(
-					2,
-					'0'
-				)}`,
-				dayName: d.toLocaleDateString('uz-UZ', { weekday: 'short' }),
-			}
+			const isoLocal = toLocalDateStr(d) // local YYYY-MM-DD
+			const now = new Date()
+			const isToday =
+				day === now.getDate() && m === now.getMonth() && y === now.getFullYear()
+			const dateLabel = `${String(day).padStart(2, '0')}.${String(
+				m + 1
+			).padStart(2, '0')}`
+			const dayName = d.toLocaleDateString('uz-UZ', { weekday: 'short' })
+			return { day, date: d, dateStr: isoLocal, isToday, dateLabel, dayName }
 		})
 	}, [selectedMonth])
 
+	// === FIXED: weekday-based filtering ===
 	const classDays = useMemo(() => {
 		if (!selectedGroup) return monthDays
-		return monthDays.filter(d => isClassDay(d.day, selectedGroup))
-	}, [monthDays, selectedGroup])
+		return monthDays.filter(d =>
+			isClassDay(d.day, {
+				...selectedGroup,
+				selectedYear: selectedMonth?.year,
+				selectedMonth: selectedMonth?.month,
+			})
+		)
+	}, [monthDays, selectedGroup, selectedMonth])
 
 	// === Token yangilash ===
 	const refreshAccessToken = useCallback(async () => {
 		if (!refreshToken) return null
-		const res = await fetch(`${API_BASE}/users/refresh`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ refreshToken }),
-		})
-		if (!res.ok) throw new Error('Token refresh failed')
-		const data = await res.json()
-		dispatch(setCredentials(data))
-		return data.accessToken
+		try {
+			const res = await fetch(`${API_BASE}/users/refresh`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ refreshToken }),
+			})
+			if (!res.ok) throw new Error('Token refresh failed')
+			const data = await res.json()
+			dispatch(setCredentials(data))
+			return data.accessToken
+		} catch (err) {
+			console.error('refreshAccessToken error:', err)
+			return null
+		}
 	}, [refreshToken, dispatch])
 
 	// === Avtorizatsiyali fetch ===
 	const authFetch = useCallback(
 		async (url, opts = {}) => {
 			const attempt = async token => {
-				const res = await fetch(url, {
-					...opts,
-					headers: {
-						Authorization: `Bearer ${token}`,
-						'Content-Type': 'application/json',
-						...(opts.headers || {}),
-					},
-				})
+				const headers = {
+					Authorization: token ? `Bearer ${token}` : undefined,
+					'Content-Type': 'application/json',
+					...(opts.headers || {}),
+				}
+				const res = await fetch(url, { ...opts, headers })
 				if (res.status === 401) throw new Error('401')
 				if (!res.ok) {
 					const text = await res.text()
 					throw new Error(text || `HTTP ${res.status}`)
 				}
-				try {
-					return await res.json()
-				} catch {
-					return null
-				}
+				const ct = res.headers.get('content-type') || ''
+				if (ct.includes('application/json')) return await res.json()
+				return null
 			}
+
 			try {
 				return await attempt(accessToken)
 			} catch (e) {
@@ -181,8 +217,8 @@ const Guruhlar = () => {
 	const handleGroupClick = async group => {
 		setSelectedGroup(group)
 		setStudents([])
-
 		try {
+			// if students are embedded in group, use them, else fetch if API provides endpoint
 			const studentsInGroup = (group.students || []).map(niceStudent)
 			setStudents(studentsInGroup)
 		} catch (err) {
@@ -195,35 +231,30 @@ const Guruhlar = () => {
 		if (!selectedGroup || !selectedMonth) return
 		setIsLoading(prev => ({ ...prev, attendance: true }))
 		try {
-			const start = new Date(selectedMonth.year, selectedMonth.month, 1)
-				.toISOString()
-				.split('T')[0]
-			const end = new Date(selectedMonth.year, selectedMonth.month + 1, 0)
-				.toISOString()
-				.split('T')[0]
+			// Use local YYYY-MM-DD strings to avoid timezone shifts
+			const startDate = new Date(selectedMonth.year, selectedMonth.month, 1)
+			const endDate = new Date(selectedMonth.year, selectedMonth.month + 1, 0)
+			const start = toLocalDateStr(startDate)
+			const end = toLocalDateStr(endDate)
 
 			const groupParam =
 				selectedGroup.group_id ?? selectedGroup.id ?? gid(selectedGroup)
 			const res = await authFetch(
 				`${API_BASE}/attendance?group_id=${groupParam}&start=${start}&end=${end}`
 			)
-
-			console.log('API Response:', res) // Debug uchun
-
 			const data = Array.isArray(res) ? res : res?.attendance || []
-			console.log('Attendance Data:', data) // Debug uchun
-
 			const map = {}
 			data.forEach(r => {
-				console.log('Record:', r) // Har bir yozuvni ko'rish
-				const dateStr = (r.date || '').split('T')[0]
+				// Normalize date coming from backend (attempt to parse date portion)
+				let dateStr = r.date || r.dateStr || ''
+				// If backend sent ISO with time, extract YYYY-MM-DD
+				if (dateStr.includes('T')) dateStr = dateStr.split('T')[0]
+				// If backend returned UTC-shifted YYYY-MM-DD, keep as-is; we match local dateStr format above
 				if (!dateStr) return
 				const key = attKey(gid(selectedGroup), sid(r), dateStr)
 				map[key] =
 					r.status === 'present' || r.status === true ? 'present' : 'absent'
-				console.log(`Key: ${key}, Status: ${map[key]}`) // Key va status ni ko'rish
 			})
-			console.log('Final Attendance Map:', map) // Oxirgi map
 			setAttendance(map)
 		} catch (err) {
 			console.error('Davomat yuklashda xato:', err)
@@ -236,8 +267,116 @@ const Guruhlar = () => {
 		if (selectedGroup) loadAttendance()
 	}, [selectedGroup, selectedMonth, loadAttendance])
 
+	// === Vaqtni tekshirish ===
+	const canMarkAttendance = dateStr => {
+		if (!selectedGroup) {
+			return { allowed: false, message: 'Guruh tanlanmagan.' }
+		}
+
+		const now = new Date()
+
+		// Parse the date string correctly (YYYY-MM-DD format), assuming local date
+		const parts = dateStr.split('-').map(Number)
+		if (parts.length !== 3) {
+			return { allowed: false, message: "Noto'g'ri sana formatı." }
+		}
+		const [year, month, day] = parts
+		const selectedDate = new Date(year, month - 1, day)
+
+		// Set time to start of day for accurate comparison
+		const todayStart = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate()
+		)
+		todayStart.setHours(0, 0, 0, 0)
+
+		const selectedStart = new Date(
+			selectedDate.getFullYear(),
+			selectedDate.getMonth(),
+			selectedDate.getDate()
+		)
+		selectedStart.setHours(0, 0, 0, 0)
+
+		// Check if the selected date is in the past
+		if (selectedStart.getTime() < todayStart.getTime()) {
+			return {
+				allowed: false,
+				message: "O'tgan kunlar uchun davomat belgilab bo'lmaydi!",
+			}
+		}
+
+		// Check if the selected date is in the future
+		if (selectedStart.getTime() > todayStart.getTime()) {
+			return {
+				allowed: false,
+				message: "Kelajak kunlar uchun davomat belgilab bo'lmaydi!",
+			}
+		}
+
+		// It's today, now check class time
+		const startTime = selectedGroup?.start_time || '00:00'
+		const endTime = selectedGroup?.end_time || '23:59'
+
+		// Parse time strings safely (fallback if format unexpected)
+		const parseTime = t => {
+			const p = String(t)
+				.split(':')
+				.map(n => Number(n))
+			const h = Number.isFinite(p[0]) ? p[0] : 0
+			const mm = Number.isFinite(p[1]) ? p[1] : 0
+			return {
+				h: Math.max(0, Math.min(23, h)),
+				m: Math.max(0, Math.min(59, mm)),
+			}
+		}
+		const s = parseTime(startTime)
+		const e = parseTime(endTime)
+
+		// Current time in minutes since midnight
+		const currentMinutes = now.getHours() * 60 + now.getMinutes()
+		const classStartMinutes = s.h * 60 + s.m
+		const classEndMinutes = e.h * 60 + e.m
+
+		// Helper to format HH:MM nicely
+		const formatTime = timeStr => {
+			const parts = String(timeStr).split(':')
+			const hh = parts[0] ? String(parts[0]).padStart(2, '0') : '00'
+			const mm = parts[1] ? String(parts[1]).padStart(2, '0') : '00'
+			return `${hh}:${mm}`
+		}
+
+		// Check if current time is before class starts
+		if (currentMinutes < classStartMinutes) {
+			return {
+				allowed: false,
+				message: `Dars hali boshlanmagan! Dars vaqti: ${formatTime(
+					startTime
+				)} - ${formatTime(endTime)}`,
+			}
+		}
+
+		// Check if current time is after class ends
+		if (currentMinutes > classEndMinutes) {
+			return {
+				allowed: false,
+				message: `Dars tugagan! Dars vaqti: ${formatTime(
+					startTime
+				)} - ${formatTime(endTime)}`,
+			}
+		}
+
+		return { allowed: true }
+	}
+
 	// === Davomat belgilash ===
 	const markAttendance = async (studentIdRaw, dateStr, status) => {
+		// Vaqtni tekshirish
+		const timeCheck = canMarkAttendance(dateStr)
+		if (!timeCheck.allowed) {
+			alert(timeCheck.message)
+			return
+		}
 		const studentId = String(studentIdRaw)
 		const key = attKey(gid(selectedGroup), studentId, dateStr)
 		const prev = attendance[key]
@@ -248,7 +387,6 @@ const Guruhlar = () => {
 				selectedGroup.group_id ?? selectedGroup.id ?? gid(selectedGroup)
 			const groupNumeric = Number(groupVal)
 			const studentNumeric = Number(studentId)
-
 			const payload = {
 				group_id: !Number.isNaN(groupNumeric) ? groupNumeric : groupVal,
 				student_id: !Number.isNaN(studentNumeric) ? studentNumeric : studentId,
@@ -257,14 +395,10 @@ const Guruhlar = () => {
 				date: dateStr,
 				status: status === 'present',
 			}
-
-			console.log('Sending payload:', payload) // Debug uchun
-
 			await authFetch(`${API_BASE}/attendance`, {
 				method: 'POST',
 				body: JSON.stringify(payload),
 			})
-
 			setShowOptions(null)
 		} catch (err) {
 			console.error('Davomat belgilashda xato:', err)
@@ -286,7 +420,7 @@ const Guruhlar = () => {
 			: 'bg-gray-100 border border-gray-300'
 
 	const filteredGroups = groups.filter(g =>
-		g.name?.toLowerCase().includes(search.toLowerCase())
+		(g.name || '').toLowerCase().includes(search.toLowerCase())
 	)
 
 	// === YUKLANMOQDA ===
@@ -392,6 +526,7 @@ const Guruhlar = () => {
 						<GraduationCap className='w-6 h-6 text-[#0066CC]' />
 						<h1 className='text-xl font-bold text-gray-900'>Davomat jadvali</h1>
 					</div>
+
 					<div className='relative'>
 						<select
 							value={gid(selectedGroup)}
@@ -459,7 +594,7 @@ const Guruhlar = () => {
 					))}
 				</div>
 
-				{/* Jadval - scrollable container */}
+				{/* Jadval */}
 				{isLoading.attendance ? (
 					<div className='flex items-center justify-center h-64'>
 						<Loader2 className='w-8 h-8 animate-spin text-[#0066CC]' />
@@ -470,7 +605,7 @@ const Guruhlar = () => {
 							<table className='w-full'>
 								<thead className='sticky top-0 z-20 bg-white'>
 									<tr className='border-b border-gray-200 bg-[#F8FAFC]'>
-										<th className='sticky left-0 bg-[#F8FAFC] z-30 text-left px-4 py-3 font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]'>
+										<th className='sticky left-0 bg-[#F8FAFC] z-30 text-left px-4 py-3 font-semibold text-gray-700 border-r border-gray-200 min-w-[400px]'>
 											O'quvchilar ro'yxati
 										</th>
 										{classDays.map(d => (
@@ -498,7 +633,7 @@ const Guruhlar = () => {
 											>
 												<td className='sticky left-0 bg-white z-10 px-4 py-3 border-r border-gray-200'>
 													<div className='flex items-center gap-3'>
-														<span className='w-7 h-7 rounded-full bg-[#0066CC] text-white text-sm flex items-center justify-center font-semibold'>
+														<span className='w-[30px] h-[30px] rounded-full bg-[#0066CC] text-white text-sm flex items-center justify-center font-semibold'>
 															{i + 1}
 														</span>
 														<span className='font-medium text-gray-900'>
@@ -506,6 +641,7 @@ const Guruhlar = () => {
 														</span>
 													</div>
 												</td>
+
 												{classDays.map(d => {
 													const key = attKey(
 														gid(selectedGroup),
@@ -513,7 +649,6 @@ const Guruhlar = () => {
 														d.dateStr
 													)
 													const status = attendance[key]
-
 													return (
 														<td
 															key={d.dateStr}

@@ -38,7 +38,6 @@ import SuperAdminFinance from '../pages/SuperAdmin/Finance'
 import SuperAdminEmployees from '../pages/SuperAdmin/Employees'
 import SuperAdminMarketing from '../pages/SuperAdmin/Marketing'
 import SuperAdminGroups from '../pages/SuperAdmin/Groups'
-import SuperAdminProblems from '../pages/SuperAdmin/Problems'
 import SuperAdminSozlamalar from '../pages/SuperAdmin/Sozlamalar'
 
 import MentorDashboard from '../pages/Mentor/Dashboard'
@@ -78,7 +77,6 @@ const routes = createHashRouter([
 					{ path: 'employees', element: <SuperAdminEmployees /> },
 					{ path: 'marketing', element: <SuperAdminMarketing /> },
 					{ path: 'groups', element: <SuperAdminGroups /> },
-					{ path: 'problems', element: <SuperAdminProblems /> },
 					{ path: 'sozlamalar', element: <SuperAdminSozlamalar /> },
 				],
 			},

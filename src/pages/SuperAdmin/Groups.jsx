@@ -1,1020 +1,1152 @@
-import React, {
-	useEffect,
-	useMemo,
-	useReducer,
-	useCallback,
-	useRef,
-	useState,
-} from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
+import { setCredentials } from '../../redux/authSlice'
 import {
-	AlertCircle,
 	Clock,
-	CheckCircle,
-	User,
-	Phone,
-	Mail,
-	Calendar,
-	MessageSquare,
+	Code,
 	Search,
-	RefreshCw,
+	MapPin,
+	Book,
+	User,
+	X,
 	Users,
-	Shield,
-	GraduationCap,
-	UserCheck,
+	Plus,
+	ChevronLeft,
+	Calendar,
+	CheckCircle,
+	XCircle,
 } from 'lucide-react'
-import { setCredentials, logout } from '../../redux/authSlice'
 
-// ===== Config =====
-const API_BASE =
-	(typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) ||
-	(typeof process !== 'undefined' && process.env?.REACT_APP_API_BASE) ||
-	'https://zuhrstar-production.up.railway.app/api'
+const Guruhlar = () => {
+	const dispatch = useDispatch()
+	const accessToken = useSelector(state => state.auth.accessToken)
+	const refreshToken = useSelector(state => state.auth.refreshToken)
 
-const PAGE_SIZE = 6
+	const [groups, setGroups] = useState([])
+	const [teachers, setTeachers] = useState([])
+	const [courses, setCourses] = useState([])
+	const [search, setSearch] = useState('')
+	const [selectedGroup, setSelectedGroup] = useState(null)
+	const [showCreateModal, setShowCreateModal] = useState(false)
+	const [isCreating, setIsCreating] = useState(false)
+	const [isLoadingTeachers, setIsLoadingTeachers] = useState(true)
+	const [isLoadingCourses, setIsLoadingCourses] = useState(true)
+	const [attendance, setAttendance] = useState([])
+	const [isLoadingAttendance, setIsLoadingAttendance] = useState(false)
+	const [currentMonth, setCurrentMonth] = useState(new Date())
+	const [showAttendanceModal, setShowAttendanceModal] = useState(false)
+	const [selectedStudent, setSelectedStudent] = useState(null)
+	const [selectedDate, setSelectedDate] = useState(null)
 
-// Reporter Type enum
-const REPORTER_TYPES = {
-	STUDENT: 'student',
-	ADMIN: 'admin',
-	TEACHER: 'teacher',
-}
+	const [newGroup, setNewGroup] = useState({
+		name: '',
+		course: '',
+		courseId: '',
+		teacher: '',
+		branch: '',
+		days: { odd_days: false, even_days: false, every_days: false },
+		start_time: '',
+		end_time: '',
+		students: [],
+		telegramChatId: '',
+	})
 
-// Reporter Type UI config
-const REPORTER_CONFIG = {
-	[REPORTER_TYPES.STUDENT]: {
-		icon: <GraduationCap className='w-4 h-4' />,
-		text: 'Студенты',
-		badgeClass: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white',
-		countTextClass: 'text-blue-600',
-		dotClass: 'bg-blue-100',
-	},
-	[REPORTER_TYPES.ADMIN]: {
-		icon: <Shield className='w-4 h-4' />,
-		text: 'Админы',
-		badgeClass: 'bg-gradient-to-r from-purple-500 to-pink-500 text-white',
-		countTextClass: 'text-purple-600',
-		dotClass: 'bg-purple-100',
-	},
-	[REPORTER_TYPES.TEACHER]: {
-		icon: <Users className='w-4 h-4' />,
-		text: 'Учителя',
-		badgeClass: 'bg-gradient-to-r from-green-500 to-emerald-500 text-white',
-		countTextClass: 'text-green-600',
-		dotClass: 'bg-green-100',
-	},
-}
-
-const safeString = v => (typeof v === 'string' ? v : '')
-const norm = v => safeString(v).toLowerCase().trim()
-const toDate = v => (v ? new Date(v) : null)
-const formatDate = (v, opts = {}) => {
-	const d = toDate(v)
-	if (!d || Number.isNaN(d.getTime())) return '—'
-	return d.toLocaleDateString('uz-UZ', opts)
-}
-const formatDateTime = v => {
-	const d = toDate(v)
-	if (!d || Number.isNaN(d.getTime())) return '—'
-	return d.toLocaleString('uz-UZ')
-}
-
-function useDebounced(value, delay = 400) {
-	const [deb, setDeb] = React.useState(value)
-	useEffect(() => {
-		const t = setTimeout(() => setDeb(value), delay)
-		return () => clearTimeout(t)
-	}, [value, delay])
-	return deb
-}
-
-// ===== Skeleton Components =====
-const SkeletonCard = () => (
-	<div className='bg-white rounded-xl shadow-lg p-6 border border-gray-100 animate-pulse'>
-		<div className='flex items-center gap-3 mb-4'>
-			<div className='p-2 rounded-full bg-gray-200 w-10 h-10'></div>
-			<div className='h-5 bg-gray-200 rounded w-1/3'></div>
-		</div>
-		<div className='space-y-2 mb-4'>
-			<div className='h-3 bg-gray-200 rounded w-1/4'></div>
-			<div className='flex gap-2'>
-				<div className='h-5 bg-gray-200 rounded w-16'></div>
-				<div className='h-5 bg-gray-200 rounded w-20'></div>
-			</div>
-		</div>
-		<div className='bg-gray-100 rounded-lg p-3 mb-4'>
-			<div className='space-y-2'>
-				<div className='h-3 bg-gray-200 rounded w-full'></div>
-				<div className='h-3 bg-gray-200 rounded w-2/3'></div>
-			</div>
-		</div>
-		<div className='flex justify-between items-center'>
-			<div className='flex gap-3'>
-				<div className='h-3 bg-gray-200 rounded w-20'></div>
-				<div className='h-3 bg-gray-200 rounded w-24'></div>
-			</div>
-			<div className='h-5 bg-gray-200 rounded w-16'></div>
-		</div>
-	</div>
-)
-
-const SkeletonOperator = () => (
-	<div className='bg-white rounded-lg p-4 border-2 border-gray-200 animate-pulse'>
-		<div className='flex items-center gap-3'>
-			<div className='w-8 h-8 rounded-full bg-gray-200'></div>
-			<div className='flex-1 space-y-2'>
-				<div className='h-4 bg-gray-200 rounded w-2/3'></div>
-				<div className='h-3 bg-gray-200 rounded w-1/2'></div>
-			</div>
-		</div>
-	</div>
-)
-
-const SkeletonStats = () => (
-	<div className='bg-white rounded-xl shadow-lg p-6 border border-gray-100 animate-pulse'>
-		<div className='flex items-center justify-between'>
-			<div className='space-y-2'>
-				<div className='h-4 bg-gray-200 rounded w-20'></div>
-				<div className='h-8 bg-gray-200 rounded w-12'></div>
-			</div>
-			<div className='w-12 h-12 rounded-full bg-gray-200'></div>
-		</div>
-	</div>
-)
-
-// ===== State =====
-const initialState = {
-	complaints: [],
-	admins: [],
-	teachers: [],
-	loading: true,
-	error: null,
-	search: '',
-	reporterFilter: 'all',
-	sortBy: 'date_desc',
-	page: 1,
-	refreshing: false,
-	assignLoading: false,
-	dragOverTarget: null, // New state for tracking drag over target
-}
-
-function reducer(state, action) {
-	switch (action.type) {
-		case 'SET_DATA':
-			return {
-				...state,
-				complaints: action.payload,
-				loading: false,
-				refreshing: false,
-				error: null,
-			}
-		case 'SET_ADMINS':
-			return { ...state, admins: action.payload }
-		case 'SET_TEACHERS':
-			return { ...state, teachers: action.payload }
-		case 'SET_ERROR':
-			return {
-				...state,
-				loading: false,
-				refreshing: false,
-				error: action.payload || 'Xatolik yuz berdi',
-			}
-		case 'LOADING':
-			return { ...state, loading: true, error: null }
-		case 'REFRESHING':
-			return { ...state, refreshing: true, error: null }
-		case 'SET_SEARCH':
-			return { ...state, search: action.payload, page: 1 }
-		case 'SET_FILTER':
-			return { ...state, reporterFilter: action.payload, page: 1 }
-		case 'SET_SORT':
-			return { ...state, sortBy: action.payload }
-		case 'SET_PAGE':
-			return { ...state, page: action.payload }
-		case 'SET_ASSIGN_LOADING':
-			return { ...state, assignLoading: action.payload }
-		case 'SET_DRAG_OVER_TARGET':
-			return { ...state, dragOverTarget: action.payload }
-		case 'UPDATE_COMPLAINT':
-			return {
-				...state,
-				complaints: state.complaints.map(c =>
-					c._id === action.payload._id || c.id === action.payload.id
-						? { ...c, ...action.payload }
-						: c
-				),
-			}
-		default:
-			return state
+	const resetForm = () => {
+		setNewGroup({
+			name: '',
+			course: '',
+			courseId: '',
+			teacher: '',
+			branch: '',
+			days: { odd_days: false, even_days: false, every_days: false },
+			start_time: '',
+			end_time: '',
+			students: [],
+			telegramChatId: '',
+		})
 	}
-}
 
-const getId = obj => obj?.id ?? obj?._id ?? obj?.uuid ?? null
+	const handleInputChange = (field, value) => {
+		setNewGroup(prev => ({ ...prev, [field]: value }))
+	}
 
-const Problems = () => {
-	const [state, dispatch] = useReducer(reducer, initialState)
-	const {
-		complaints,
-		admins,
-		teachers,
-		loading,
-		error,
-		search,
-		reporterFilter,
-		sortBy,
-		page,
-		refreshing,
-		assignLoading,
-		dragOverTarget,
-	} = state
-	const [draggedItem, setDraggedItem] = useState(null)
+	const handleTeacherChange = id => {
+		setNewGroup(prev => ({ ...prev, teacher: id }))
+	}
 
-	const debouncedSearch = useDebounced(search, 400)
-	const abortRef = useRef(null)
+	const handleCourseChange = val => {
+		const c = courses.find(
+			x => String(x._id || x.id || x.name) === String(val) || x.name === val
+		)
+		setNewGroup(prev => ({
+			...prev,
+			course: c?.name || '',
+			courseId: c?._id || c?.id || '',
+		}))
+	}
 
-	const reduxDispatch = useDispatch()
-	const accessToken = useSelector(s => s.auth.accessToken)
-	const refreshToken = useSelector(s => s.auth.refreshToken)
-	const user = useSelector(s => s.auth.user)
+	const handleDaysChange = dayType => {
+		setNewGroup(prev => ({
+			...prev,
+			days: {
+				odd_days: dayType === 'odd_days',
+				even_days: dayType === 'even_days',
+				every_days: dayType === 'every_days',
+			},
+		}))
+	}
 
-	// ===== Refresh access token =====
-	const refreshingRef = useRef(false)
-	const refreshAccessToken = useCallback(async () => {
-		if (refreshingRef.current) {
-			await new Promise(r => setTimeout(r, 300))
-			return accessToken
-		}
-		if (!refreshToken) {
-			reduxDispatch(logout())
-			dispatch({ type: 'SET_ERROR', payload: 'Требуется авторизация.' })
-			return null
-		}
-		refreshingRef.current = true
+	const fetchTeachers = async token => {
 		try {
-			const res = await fetch(`${API_BASE}/users/refresh`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refreshToken }),
-			})
-			if (!res.ok) throw new Error('Ошибка обновления токена')
-			const data = await res.json()
-			if (!data.accessToken) throw new Error('accessToken отсутствует в ответе')
-			reduxDispatch(
-				setCredentials({
-					user,
-					accessToken: data.accessToken,
-					refreshToken: data.refreshToken,
-				})
-			)
-			return data.accessToken
-		} catch (e) {
-			reduxDispatch(logout())
-			dispatch({
-				type: 'SET_ERROR',
-				payload: e.message || 'Ошибка при обновлении токена',
-			})
-			return null
-		} finally {
-			refreshingRef.current = false
-		}
-	}, [accessToken, refreshToken, reduxDispatch, user])
-
-	// ===== Generic fetch with 401 retry =====
-	const authedFetch = useCallback(
-		async (path, options = {}) => {
-			const attempt = async tokenToUse => {
-				const res = await fetch(`${API_BASE}${path}`, {
-					...options,
+			const res = await fetch(
+				'https://zuhrstar-production.up.railway.app/api/teachers',
+				{
 					headers: {
+						Authorization: `Bearer ${token}`,
 						'Content-Type': 'application/json',
-						...(options.headers || {}),
-						Authorization: `Bearer ${tokenToUse}`,
 					},
-				})
-				if (res.status === 401) return { needRefresh: true }
-				return { res }
+				}
+			)
+
+			if (res.status === 401) {
+				const refreshRes = await fetch(
+					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					{
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ refreshToken }),
+					}
+				)
+				if (!refreshRes.ok) throw new Error('Token refresh failed.')
+				const refreshData = await refreshRes.json()
+				dispatch(setCredentials(refreshData))
+				return fetchTeachers(refreshData.accessToken)
 			}
 
-			const token = accessToken
-			if (!token) {
-				const newTok = await refreshAccessToken()
-				if (!newTok) throw new Error('Нет accessToken')
-				const { res, needRefresh } = await attempt(newTok)
-				if (needRefresh) throw new Error('Авторизация не удалась')
-				return res
-			}
+			if (!res.ok) throw new Error('Failed to fetch teachers')
 
-			const first = await attempt(token)
-			if (first.needRefresh) {
-				const newTok = await refreshAccessToken()
-				if (!newTok) throw new Error('Не удалось обновить accessToken')
-				const second = await attempt(newTok)
-				if (second.needRefresh) throw new Error('Авторизация не удалась')
-				return second.res
-			}
-			return first.res
-		},
-		[accessToken, refreshAccessToken]
-	)
-
-	// ===== Load data =====
-	const fetchComplaints = useCallback(
-		async ({ refreshing = false } = {}) => {
-			try {
-				abortRef.current?.abort()
-				const controller = new AbortController()
-				abortRef.current = controller
-
-				if (refreshing) dispatch({ type: 'REFRESHING' })
-				else dispatch({ type: 'LOADING' })
-
-				const res = await authedFetch('/problems', {
-					method: 'GET',
-					signal: controller.signal,
-				})
-				if (!res.ok)
-					throw new Error(`Ma'lumotlarni olishda xatolik (${res.status})`)
-				const data = await res.json()
-				const list = Array.isArray(data)
-					? data
-					: data?.problems || data?.data || []
-				dispatch({ type: 'SET_DATA', payload: list })
-			} catch (e) {
-				if (e.name === 'AbortError') return
-				dispatch({ type: 'SET_ERROR', payload: e.message })
-			}
-		},
-		[authedFetch]
-	)
-
-	const fetchAdmins = useCallback(async () => {
-		try {
-			const res = await authedFetch('/users')
-			if (!res.ok) throw new Error('Adminlarni olishda xatolik')
 			const data = await res.json()
-			dispatch({ type: 'SET_ADMINS', payload: data.admins || [] })
-		} catch (e) {
-			console.error('Adminlarni yuklashda xatolik:', e)
+			const list = Array.isArray(data.teachers)
+				? data.teachers
+				: Array.isArray(data)
+				? data
+				: []
+			setTeachers(list)
+		} catch (err) {
+			console.error('Error fetching teachers:', err.message)
+			setTeachers([])
+		} finally {
+			setIsLoadingTeachers(false)
 		}
-	}, [authedFetch])
+	}
 
-	const fetchTeachers = useCallback(async () => {
+	const fetchCourses = async token => {
 		try {
-			const res = await authedFetch('/teachers')
-			if (!res.ok) throw new Error("O'qituvchilarni olishda xatolik")
+			const res = await fetch(
+				'https://zuhrstar-production.up.railway.app/api/courses',
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json',
+					},
+				}
+			)
+
+			if (res.status === 401) {
+				const refreshRes = await fetch(
+					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					{
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ refreshToken }),
+					}
+				)
+				if (!refreshRes.ok) throw new Error('Token refresh failed.')
+				const refreshData = await refreshRes.json()
+				dispatch(setCredentials(refreshData))
+				return fetchCourses(refreshData.accessToken)
+			}
+
+			if (!res.ok) throw new Error('Failed to fetch courses')
+
 			const data = await res.json()
-			dispatch({ type: 'SET_TEACHERS', payload: data.teachers || [] })
-		} catch (e) {
-			console.error("O'qituvchilarni yuklashda xatolik:", e)
+			const list = Array.isArray(data.courses)
+				? data.courses
+				: Array.isArray(data)
+				? data
+				: []
+			setCourses(list)
+		} catch (err) {
+			console.error('Error fetching courses:', err.message)
+			setCourses([])
+		} finally {
+			setIsLoadingCourses(false)
 		}
-	}, [authedFetch])
+	}
+
+	const fetchGroups = async token => {
+		try {
+			const res = await fetch(
+				'https://zuhrstar-production.up.railway.app/api/groups',
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json',
+					},
+				}
+			)
+
+			if (res.status === 401) {
+				const refreshRes = await fetch(
+					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					{
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ refreshToken }),
+					}
+				)
+				if (!refreshRes.ok) throw new Error('Token refresh failed.')
+				const refreshData = await refreshRes.json()
+				dispatch(setCredentials(refreshData))
+				return fetchGroups(refreshData.accessToken)
+			}
+
+			if (!res.ok) throw new Error('Failed to fetch groups')
+
+			const data = await res.json()
+			setGroups(Array.isArray(data) ? data : [])
+		} catch (err) {
+			console.error('Error fetching groups:', err.message)
+		}
+	}
+
+	const fetchAttendance = async (token, groupId) => {
+		setIsLoadingAttendance(true)
+		try {
+			const res = await fetch(
+				`https://zuhrstar-production.up.railway.app/api/attendance?groupId=${groupId}`,
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json',
+					},
+				}
+			)
+
+			if (res.status === 401) {
+				const refreshRes = await fetch(
+					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					{
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ refreshToken }),
+					}
+				)
+				if (!refreshRes.ok) throw new Error('Token refresh failed.')
+				const refreshData = await refreshRes.json()
+				dispatch(setCredentials(refreshData))
+				return fetchAttendance(refreshData.accessToken, groupId)
+			}
+
+			if (!res.ok) throw new Error('Failed to fetch attendance')
+
+			const data = await res.json()
+			setAttendance(Array.isArray(data) ? data : [])
+		} catch (err) {
+			console.error('Error fetching attendance:', err.message)
+			setAttendance([])
+		} finally {
+			setIsLoadingAttendance(false)
+		}
+	}
+
+	const markAttendance = async (studentId, date, status) => {
+		try {
+			const res = await fetch(
+				'https://zuhrstar-production.up.railway.app/api/attendance',
+				{
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${accessToken}`,
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						groupId: selectedGroup._id,
+						studentId,
+						date: date.toISOString().split('T')[0],
+						status,
+					}),
+				}
+			)
+
+			if (!res.ok) throw new Error('Failed to mark attendance')
+
+			await fetchAttendance(accessToken, selectedGroup._id)
+			setShowAttendanceModal(false)
+		} catch (err) {
+			console.error('Error marking attendance:', err)
+			alert("Davomat qo'yishda xatolik: " + err.message)
+		}
+	}
+
+	const postGroup = async (token, payload, url) => {
+		const res = await fetch(url, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${token}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(payload),
+		})
+		const rawText = await res.text()
+		let parsed
+		try {
+			parsed = rawText ? JSON.parse(rawText) : {}
+		} catch {
+			parsed = { message: rawText }
+		}
+		return { res, parsed, rawText }
+	}
+
+	const createGroup = async token => {
+		try {
+			if (!newGroup.teacher) {
+				alert("Iltimos, o'qituvchini tanlang!")
+				return
+			}
+
+			const selectedTeacher = teachers.find(t => t._id === newGroup.teacher)
+			if (!selectedTeacher) {
+				alert("Tanlangan o'qituvchi topilmadi!")
+				return
+			}
+
+			const d = newGroup.days || {}
+			const safeDays =
+				d.odd_days || d.even_days || d.every_days
+					? {
+							odd_days: !!d.odd_days,
+							even_days: !!d.even_days,
+							every_days: !!d.every_days,
+					  }
+					: { odd_days: false, even_days: false, every_days: true }
+
+			const chatId =
+				newGroup.telegramChatId && String(newGroup.telegramChatId).trim()
+					? String(newGroup.telegramChatId).trim()
+					: `grp_${Date.now()}`
+
+			const payload = {
+				teacher: newGroup.teacher,
+				teacher_id: newGroup.teacher,
+				teacher_fullName: selectedTeacher.fullName,
+				name: (newGroup.name || 'Yangi guruh').trim(),
+				course: newGroup.course || 'Temp',
+				...(newGroup.courseId ? { course_id: newGroup.courseId } : {}),
+				branch: (newGroup.branch || 'Main').trim(),
+				start_time: newGroup.start_time || '09:00',
+				end_time: newGroup.end_time || '10:00',
+				days: safeDays,
+				students: Array.isArray(newGroup.students) ? newGroup.students : [],
+				telegramChatId: chatId,
+			}
+
+			let { res, parsed, rawText } = await postGroup(
+				token,
+				payload,
+				'https://zuhrstar-production.up.railway.app/api/groups'
+			)
+
+			if (res.status === 404) {
+				const second = await postGroup(
+					token,
+					payload,
+					'https://zuhrstar-production.up.railway.app/api/groups/'
+				)
+				res = second.res
+				parsed = second.parsed
+				rawText = second.rawText
+			}
+
+			if (res.status === 401) {
+				const refreshRes = await fetch(
+					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					{
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ refreshToken }),
+					}
+				)
+				if (!refreshRes.ok) throw new Error('Token refresh failed.')
+				const refreshData = await refreshRes.json()
+				dispatch(setCredentials(refreshData))
+				return createGroup(refreshData.accessToken)
+			}
+
+			if (!res.ok) {
+				const msg =
+					(parsed && (parsed.error || parsed.message)) ||
+					rawText ||
+					`HTTP ${res.status}`
+				throw new Error(msg)
+			}
+
+			const created = parsed
+			setGroups(prev => [...prev, created])
+			setShowCreateModal(false)
+			resetForm()
+			return created
+		} catch (err) {
+			console.error('Error creating group:', err)
+			alert('Guruh yaratishda xatolik: ' + (err?.message || String(err)))
+		}
+	}
+
+	const handleSubmit = async e => {
+		e.preventDefault()
+		if (!newGroup.teacher) {
+			alert("Iltimos, o'qituvchini tanlang!")
+			return
+		}
+		setIsCreating(true)
+		await createGroup(accessToken)
+		setIsCreating(false)
+	}
 
 	useEffect(() => {
-		fetchComplaints()
-		fetchAdmins()
-		fetchTeachers()
-		return () => abortRef.current?.abort()
-	}, [fetchComplaints, fetchAdmins, fetchTeachers])
-
-	const handleRefresh = useCallback(() => {
-		fetchComplaints({ refreshing: true })
-		fetchAdmins()
-		fetchTeachers()
-	}, [fetchComplaints, fetchAdmins, fetchTeachers])
-
-	// ===== Stats =====
-	const reporterCounts = useMemo(
-		() => ({
-			student: complaints.filter(
-				c => (c.reporterType || '').toLowerCase() === REPORTER_TYPES.STUDENT
-			).length,
-			admin: complaints.filter(
-				c => (c.reporterType || '').toLowerCase() === REPORTER_TYPES.ADMIN
-			).length,
-			teacher: complaints.filter(
-				c => (c.reporterType || '').toLowerCase() === REPORTER_TYPES.TEACHER
-			).length,
-		}),
-		[complaints]
-	)
-
-	// ===== Filter + Sort =====
-	const filteredSorted = useMemo(() => {
-		const q = norm(debouncedSearch)
-		const list = complaints.filter(c => {
-			const studentName =
-				c.studentName || c.student?.full_name || c.reporterName || ''
-			const matchSearch =
-				!q ||
-				norm(studentName).includes(q) ||
-				norm(c.description).includes(q) ||
-				norm(c.title).includes(q) ||
-				norm(c.category).includes(q) ||
-				norm(c.email).includes(q) ||
-				norm(c.phone).includes(q) ||
-				String(getId(c) || '').includes(q)
-			const rt = (c.reporterType || '').toLowerCase()
-			const matchReporter = reporterFilter === 'all' || rt === reporterFilter
-			return matchSearch && matchReporter
-		})
-
-		const sorted = [...list].sort((a, b) => {
-			const aDate =
-				toDate(a.date || a.createdAt || a.created_at)?.getTime() || 0
-			const bDate =
-				toDate(b.date || b.createdAt || b.created_at)?.getTime() || 0
-			switch (sortBy) {
-				case 'date_asc':
-					return aDate - bDate
-				case 'status':
-					return norm(a.status).localeCompare(norm(b.status))
-				case 'name': {
-					const an = norm(
-						a.studentName || a.student?.full_name || a.reporterName || ''
-					)
-					const bn = norm(
-						b.studentName || b.student?.full_name || b.reporterName || ''
-					)
-					return an.localeCompare(bn)
-				}
-				case 'course':
-					return norm(a.course).localeCompare(norm(b.course || ''))
-				case 'date_desc':
-				default:
-					return bDate - aDate
-			}
-		})
-
-		return sorted
-	}, [complaints, debouncedSearch, reporterFilter, sortBy])
-
-	// ===== Pagination =====
-	const totalPages = Math.max(1, Math.ceil(filteredSorted.length / PAGE_SIZE))
-	const pageSafe = Math.min(page, totalPages)
-	const pagedItems = useMemo(() => {
-		const start = (pageSafe - 1) * PAGE_SIZE
-		return filteredSorted.slice(start, start + PAGE_SIZE)
-	}, [filteredSorted, pageSafe])
-
-	// ===== Handlers =====
-	const onSearch = useCallback(
-		e => dispatch({ type: 'SET_SEARCH', payload: e.target.value }),
-		[]
-	)
-	const onFilter = useCallback(
-		val => dispatch({ type: 'SET_FILTER', payload: val }),
-		[]
-	)
-	const onSort = useCallback(
-		e => dispatch({ type: 'SET_SORT', payload: e.target.value }),
-		[]
-	)
-	const goPage = useCallback(
-		p => dispatch({ type: 'SET_PAGE', payload: p }),
-		[]
-	)
-
-	// ===== Enhanced Drag & Drop =====
-	const handleDragStart = useCallback((e, complaint) => {
-		setDraggedItem(complaint)
-		e.dataTransfer.effectAllowed = 'move'
-	}, [])
-
-	const handleDragEnd = useCallback(() => {
-		setDraggedItem(null)
-		dispatch({ type: 'SET_DRAG_OVER_TARGET', payload: null })
-	}, [])
-
-	const handleDragOver = useCallback(
-		(e, operator) => {
-			e.preventDefault()
-			e.dataTransfer.dropEffect = 'move'
-			const operatorId = getId(operator)
-			if (dragOverTarget !== operatorId) {
-				dispatch({ type: 'SET_DRAG_OVER_TARGET', payload: operatorId })
-			}
-		},
-		[dragOverTarget]
-	)
-
-	const handleDragLeave = useCallback(e => {
-		// Only clear drag over target if we're leaving the drop zone completely
-		const rect = e.currentTarget.getBoundingClientRect()
-		const x = e.clientX
-		const y = e.clientY
-
-		if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-			dispatch({ type: 'SET_DRAG_OVER_TARGET', payload: null })
+		if (accessToken) {
+			fetchGroups(accessToken)
+			fetchTeachers(accessToken)
+			fetchCourses(accessToken)
 		}
-	}, [])
+	}, [accessToken])
 
-	const handleDrop = useCallback(
-		async (e, operator) => {
-			e.preventDefault()
-			dispatch({ type: 'SET_DRAG_OVER_TARGET', payload: null })
+	const isClassDay = (date, groupDays) => {
+		if (!groupDays) return false
+		if (groupDays.every_days) return true
+		const dayOfMonth = date.getDate()
+		if (groupDays.odd_days && dayOfMonth % 2 !== 0) return true
+		if (groupDays.even_days && dayOfMonth % 2 === 0) return true
+		return false
+	}
 
-			if (!draggedItem || assignLoading) return
+	const getClassDaysInMonth = (date, groupDays) => {
+		const year = date.getFullYear()
+		const month = date.getMonth()
+		const firstDay = new Date(year, month, 1)
+		const lastDay = new Date(year, month + 1, 0)
+		const days = []
 
-			dispatch({ type: 'SET_ASSIGN_LOADING', payload: true })
-
-			try {
-				const problemId = getId(draggedItem)
-				const operatorId = getId(operator)
-
-				const res = await authedFetch(`/problems/${problemId}/assign`, {
-					method: 'PUT',
-					body: JSON.stringify({ assignedTo: operatorId }),
-				})
-
-				if (!res.ok) throw new Error('Назначение не удалось')
-
-				const updatedProblem = await res.json()
-				dispatch({ type: 'UPDATE_COMPLAINT', payload: updatedProblem })
-
-				// Success notification could be added here
-			} catch (e) {
-				console.error('Ошибка назначения:', e)
-				// Error notification could be added here
-			} finally {
-				dispatch({ type: 'SET_ASSIGN_LOADING', payload: false })
-				setDraggedItem(null)
+		for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+			if (isClassDay(d, groupDays)) {
+				days.push(new Date(d))
 			}
-		},
-		[draggedItem, assignLoading, authedFetch]
+		}
+		return days
+	}
+
+	const isClassTimeNow = group => {
+		const now = new Date()
+
+		if (!isClassDay(now, group.days)) return false
+
+		const [startHour, startMin] = group.start_time.split(':').map(Number)
+		const [endHour, endMin] = group.end_time.split(':').map(Number)
+
+		const currentHour = now.getHours()
+		const currentMin = now.getMinutes()
+		const currentTime = currentHour * 60 + currentMin
+		const startTime = startHour * 60 + startMin
+		const endTime = endHour * 60 + endMin
+
+		return currentTime >= startTime && currentTime <= endTime
+	}
+
+	const getAttendanceStatus = (studentId, date) => {
+		const dateStr = date.toISOString().split('T')[0]
+		const record = attendance.find(
+			a => a.studentId === studentId && a.date?.split('T')[0] === dateStr
+		)
+		if (record) {
+			return record.status === 'present' ? 'present' : 'absent'
+		}
+		return 'unmarked'
+	}
+
+	const formatDays = days => {
+		if (!days) return 'Nomaʼlum'
+		if (days.every_days) return 'Har kuni'
+		if (days.odd_days) return 'Toq kunlar'
+		if (days.even_days) return 'Juft kunlar'
+		return 'Nomaʼlum'
+	}
+
+	const filteredGroups = groups.filter(g =>
+		g.name?.toLowerCase().includes(search.toLowerCase())
 	)
 
-	// ===== Skeleton Loading =====
-	if (loading) {
+	const daysInMonth = selectedGroup
+		? getClassDaysInMonth(currentMonth, selectedGroup.days)
+		: []
+	const monthNames = [
+		'Yanvar',
+		'Fevral',
+		'Mart',
+		'Aprel',
+		'May',
+		'Iyun',
+		'Iyul',
+		'Avgust',
+		'Sentyabr',
+		'Oktyabr',
+		'Noyabr',
+		'Dekabr',
+	]
+	const monthName = `${
+		monthNames[currentMonth.getMonth()]
+	} ${currentMonth.getFullYear()}`
+
+	const handleGroupClick = group => {
+		setSelectedGroup(group)
+		if (group._id) {
+			fetchAttendance(accessToken, group._id)
+		}
+	}
+
+	const previousMonth = () => {
+		const newMonth = new Date(currentMonth)
+		newMonth.setMonth(newMonth.getMonth() - 1)
+		setCurrentMonth(newMonth)
+	}
+
+	const nextMonth = () => {
+		const newMonth = new Date(currentMonth)
+		newMonth.setMonth(newMonth.getMonth() + 1)
+		setCurrentMonth(newMonth)
+	}
+
+	const handleCellClick = (student, date) => {
+		if (isClassTimeNow(selectedGroup)) {
+			setSelectedStudent(student)
+			setSelectedDate(date)
+			setShowAttendanceModal(true)
+		}
+	}
+
+	if (selectedGroup) {
 		return (
-			<div className='min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 p-6'>
-				<div className='max-w-7xl mx-auto'>
-					{/* Header Skeleton */}
-					<div className='mb-8'>
-						<div className='flex items-center mb-6'>
-							<MessageSquare className='w-8 h-8 text-blue-600 mr-3' />
-							<div className='h-10 bg-gray-200 rounded w-48 animate-pulse'></div>
-						</div>
+			<div className='h-screen'>
+				{/* Header with group info */}
+				<div className='bg-gradient-to-r from-blue-600 to-indigo-600 shadow-xl'>
+					<div className='px-6 py-4'>
+						<button
+							onClick={() => setSelectedGroup(null)}
+							className='flex items-center gap-2 mb-3 hover:bg-white/10 px-3 py-1 rounded-xl transition-all text-white font-semibold text-sm'
+						>
+							<ChevronLeft size={16} />
+							<span>Orqaga</span>
+						</button>
 
-						{/* Statistics Cards Skeleton */}
-						<div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'>
-							{Array(3)
-								.fill(0)
-								.map((_, i) => (
-									<SkeletonStats key={i} />
-								))}
-						</div>
-					</div>
-
-					{/* Main Layout Skeleton */}
-					<div className='grid grid-cols-12 gap-6'>
-						{/* Left Side - Problems List Skeleton */}
-						<div className='col-span-8'>
-							{/* Search Skeleton */}
-							<div className='mb-6'>
-								<div className='h-10 bg-gray-200 rounded-lg animate-pulse'></div>
-							</div>
-
-							{/* Problems List Skeleton */}
-							<div className='space-y-4'>
-								{Array(PAGE_SIZE)
-									.fill(0)
-									.map((_, i) => (
-										<SkeletonCard key={i} />
-									))}
-							</div>
-						</div>
-
-						{/* Right Side - Operators Skeleton */}
-						<div className='col-span-4'>
-							<div className='h-8 bg-gray-200 rounded w-32 mb-6 animate-pulse'></div>
-
-							{/* Admins Skeleton */}
-							<div className='mb-8'>
-								<div className='h-6 bg-gray-200 rounded w-20 mb-4 animate-pulse'></div>
-								<div className='space-y-3'>
-									{Array(3)
-										.fill(0)
-										.map((_, i) => (
-											<SkeletonOperator key={i} />
-										))}
+						<div className='flex items-start justify-between'>
+							<div className='flex-1'>
+								<h1 className='text-2xl font-bold text-white mb-2'>
+									{selectedGroup.name} - Davomat
+								</h1>
+								<div className='flex flex-wrap gap-3 text-white/90'>
+									<div className='flex items-center gap-2 bg-white/10 px-3 py-1 rounded-xl text-sm'>
+										<Users size={14} />
+										<span className='font-medium'>
+											{selectedGroup.students?.length || 0} o'quvchi
+										</span>
+									</div>
+									<div className='flex items-center gap-2 bg-white/10 px-3 py-1 rounded-xl text-sm'>
+										<MapPin size={14} />
+										<span className='font-medium'>{selectedGroup.branch}</span>
+									</div>
 								</div>
 							</div>
 
-							{/* Teachers Skeleton */}
-							<div>
-								<div className='h-6 bg-gray-200 rounded w-20 mb-4 animate-pulse'></div>
-								<div className='space-y-3'>
-									{Array(4)
-										.fill(0)
-										.map((_, i) => (
-											<SkeletonOperator key={i} />
-										))}
+							{/* Group details cards */}
+							<div className='flex gap-2'>
+								<div className='bg-white/10 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20'>
+									<div className='text-xs text-white/70 mb-1'>Kurs</div>
+									<div className='font-bold text-white text-sm'>
+										{selectedGroup.course}
+									</div>
+								</div>
+								<div className='bg-white/10 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20'>
+									<div className='text-xs text-white/70 mb-1'>O'qituvchi</div>
+									<div className='font-bold text-white text-sm'>
+										{selectedGroup.teacher_fullName || '—'}
+									</div>
+								</div>
+								<div className='bg-white/10 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20'>
+									<div className='text-xs text-white/70 mb-1'>Vaqt</div>
+									<div className='font-bold text-white text-sm'>
+										{selectedGroup.start_time} - {selectedGroup.end_time}
+									</div>
+								</div>
+								<div className='bg-white/10 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20'>
+									<div className='text-xs text-white/70 mb-1'>Kunlar</div>
+									<div className='font-bold text-white text-sm'>
+										{formatDays(selectedGroup.days)}
+									</div>
 								</div>
 							</div>
 						</div>
 					</div>
 				</div>
+
+				{/* Calendar Navigation */}
+				<div className='bg-white border-b border-gray-200 shadow-sm'>
+					<div className='px-6 py-3'>
+						<div className='flex justify-between items-center overflwo'>
+							<h2 className='text-lg font-bold text-gray-800 flex items-center gap-2'>
+								<Calendar className='text-blue-600' size={20} />
+								Davomat jadvali
+							</h2>
+							<div className='flex items-center gap-3'>
+								<button
+									onClick={previousMonth}
+									className='p-1 hover:bg-gray-100 rounded-xl transition-all'
+								>
+									<ChevronLeft size={20} />
+								</button>
+								<span className='font-bold text-lg min-w-[160px] text-center text-gray-800'>
+									{monthName}
+								</span>
+								<button
+									onClick={nextMonth}
+									className='p-1 hover:bg-gray-100 rounded-xl transition-all'
+								>
+									<ChevronLeft size={20} className='rotate-180' />
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				{/* Content - No scroll */}
+				<div className='h-[calc(100vh-200px)] px-6 py-4'>
+					<div className='bg-white rounded-xl shadow-lg h-full overflow-hidden'>
+						{isLoadingAttendance ? (
+							<div className='p-8 text-center h-full flex flex-col items-center justify-center'>
+								<div className='inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent'></div>
+								<p className='mt-3 text-gray-600 text-sm'>Yuklanmoqda...</p>
+							</div>
+						) : selectedGroup.students && selectedGroup.students.length > 0 ? (
+							<div className='h-full'>
+								<table className='w-full'>
+									<thead className='sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200'>
+										<tr>
+											<th className='px-4 py-2 text-left font-bold text-gray-800 w-60'>
+												<div className='flex items-center gap-2'>
+													<Users size={16} className='text-blue-600' />
+													<span className='text-sm'>O'quvchi</span>
+												</div>
+											</th>
+											{daysInMonth.map((day, idx) => {
+												const dayNum = day.getDate()
+												const weekDay = day.toLocaleDateString('uz-UZ', {
+													weekday: 'short',
+												})
+												const isToday =
+													day.toDateString() === new Date().toDateString()
+												return (
+													<th
+														key={idx}
+														className={`px-2 py-2 text-center ${
+															isToday ? 'bg-blue-100' : ''
+														}`}
+													>
+														<div className='flex flex-col items-center gap-0'>
+															<span
+																className={`font-bold text-sm ${
+																	isToday ? 'text-blue-600' : 'text-gray-800'
+																}`}
+															>
+																{dayNum}
+															</span>
+															<span className='text-xs text-gray-500 uppercase font-semibold'>
+																{weekDay}
+															</span>
+														</div>
+													</th>
+												)
+											})}
+										</tr>
+									</thead>
+									<tbody>
+										{selectedGroup.students.map((student, sIdx) => (
+											<tr
+												key={sIdx}
+												className='border-b border-gray-100 hover:bg-blue-50/50 transition-colors'
+											>
+												<td className='px-4 py-2 font-medium text-gray-800'>
+													<div className='flex items-center gap-2'>
+														<div className='w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow'>
+															{(student.fullName || student.name || 'N')
+																.charAt(0)
+																.toUpperCase()}
+														</div>
+														<div>
+															<p className='font-semibold text-xs'>
+																{student.fullName || student.name}
+															</p>
+															{student.phone && (
+																<p className='text-xs text-gray-500'>
+																	{student.phone}
+																</p>
+															)}
+														</div>
+													</div>
+												</td>
+												{daysInMonth.map((day, dIdx) => {
+													const status = getAttendanceStatus(
+														student._id || student.id,
+														day
+													)
+													const canMark =
+														isClassTimeNow(selectedGroup) &&
+														day.toISOString().split('T')[0] ===
+															new Date().toISOString().split('T')[0]
+													const isToday =
+														day.toDateString() === new Date().toDateString()
+
+													return (
+														<td
+															key={dIdx}
+															className={`px-2 py-2 text-center ${
+																canMark
+																	? 'cursor-pointer hover:bg-blue-200'
+																	: ''
+															} ${isToday ? 'bg-blue-50' : ''}`}
+															onClick={() =>
+																canMark && handleCellClick(student, day)
+															}
+														>
+															{status === 'present' && (
+																<div className='inline-flex items-center justify-center w-6 h-6 bg-green-100 rounded-lg'>
+																	<CheckCircle
+																		className='text-green-600'
+																		size={16}
+																	/>
+																</div>
+															)}
+															{status === 'absent' && (
+																<div className='inline-flex items-center justify-center w-6 h-6 bg-red-100 rounded-lg'>
+																	<XCircle className='text-red-600' size={16} />
+																</div>
+															)}
+															{status === 'unmarked' && (
+																<div className='inline-flex items-center justify-center w-6 h-6 bg-gray-50 rounded-lg border border-dashed border-gray-300'></div>
+															)}
+														</td>
+													)
+												})}
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						) : (
+							<div className='p-8 text-center h-full flex flex-col items-center justify-center text-gray-500'>
+								<Users size={40} className='mx-auto mb-3 text-gray-400' />
+								<p className='text-base'>
+									Bu guruhda hozircha o'quvchilar yo'q
+								</p>
+							</div>
+						)}
+					</div>
+				</div>
+
+				{showAttendanceModal && selectedStudent && selectedDate && (
+					<div className='fixed inset-0 flex items-center justify-center z-50'>
+						<div
+							className='absolute inset-0 bg-black/50 backdrop-blur-sm'
+							onClick={() => setShowAttendanceModal(false)}
+						/>
+						<div className='relative bg-white rounded-xl shadow-lg p-6 z-10 w-[350px]'>
+							<h3 className='text-xl font-bold text-gray-900 mb-4 text-center'>
+								Davomat qo'yish
+							</h3>
+							<div className='mb-4 text-center'>
+								<p className='text-base font-semibold text-gray-800'>
+									{selectedStudent.fullName || selectedStudent.name}
+								</p>
+								<p className='text-sm text-gray-500 mt-1'>
+									{selectedDate.toLocaleDateString('uz-UZ', {
+										day: 'numeric',
+										month: 'long',
+									})}
+								</p>
+							</div>
+							<div className='flex gap-3'>
+								<button
+									onClick={() =>
+										markAttendance(
+											selectedStudent._id || selectedStudent.id,
+											selectedDate,
+											'present'
+										)
+									}
+									className='flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all shadow hover:shadow-md'
+								>
+									<CheckCircle size={20} />
+									Keldi
+								</button>
+								<button
+									onClick={() =>
+										markAttendance(
+											selectedStudent._id || selectedStudent.id,
+											selectedDate,
+											'absent'
+										)
+									}
+									className='flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all shadow hover:shadow-md'
+								>
+									<XCircle size={20} />
+									Kelmadi
+								</button>
+							</div>
+							<button
+								onClick={() => setShowAttendanceModal(false)}
+								className='w-full mt-3 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all font-semibold text-sm'
+							>
+								Bekor qilish
+							</button>
+						</div>
+					</div>
+				)}
 			</div>
 		)
 	}
 
-	if (error) {
-		return (
-			<div className='min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 p-6'>
-				<div className='max-w-7xl mx-auto'>
-					<div className='bg-white rounded-2xl shadow-lg p-8 border border-red-100 flex items-center justify-between text-red-600'>
-						<div className='flex items-center'>
-							<AlertCircle className='w-8 h-8 mr-3' />
-							<span className='text-lg font-medium'>Xatolik: {error}</span>
+	return (
+		<div className=' px-6 py-8'>
+			<div className='h-full flex flex-col'>
+				<div className='flex justify-between items-center mb-6'>
+					<div>
+						<h1 className='text-3xl font-bold text-gray-900 mb-1'>Guruhlar</h1>
+						<p className='text-gray-600 text-sm'>
+							Barcha guruhlar va ularning ma'lumotlari
+						</p>
+					</div>
+					<div className='flex items-center gap-3'>
+						<div className='bg-white px-4 py-2 flex items-center gap-2 rounded-xl shadow border border-gray-100'>
+							<Search size={16} className='text-gray-400' />
+							<input
+								type='text'
+								value={search}
+								onChange={e => setSearch(e.target.value)}
+								className='outline-none text-sm w-48'
+								placeholder='Guruh qidirish...'
+							/>
 						</div>
 						<button
-							onClick={handleRefresh}
-							className='ml-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700'
+							onClick={() => setShowCreateModal(true)}
+							className='bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:shadow-lg hover:scale-105 transition-all font-semibold text-sm'
 						>
-							<RefreshCw
-								className={refreshing ? 'animate-spin w-4 h-4' : 'w-4 h-4'}
-							/>
-							Qayta urinish
+							<Plus size={16} />
+							Yangi guruh
 						</button>
 					</div>
 				</div>
-			</div>
-		)
-	}
 
-	// ===== Main View =====
-	return (
-		<div className='min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 p-6'>
-			<div className='max-w-7xl mx-auto'>
-				{/* Header */}
-				<div className='mb-8'>
-					<div className='flex items-center mb-6'>
-						<MessageSquare className='w-8 h-8 text-blue-600 mr-3' />
-						<h1 className='text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent'>
-							Muammolar
-						</h1>
-					</div>
-
-					{/* Statistics Cards */}
-					<div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'>
-						{[
-							{
-								reporterType: REPORTER_TYPES.STUDENT,
-								count: reporterCounts.student,
-							},
-							{
-								reporterType: REPORTER_TYPES.ADMIN,
-								count: reporterCounts.admin,
-							},
-							{
-								reporterType: REPORTER_TYPES.TEACHER,
-								count: reporterCounts.teacher,
-							},
-						].map(({ reporterType, count }) => (
+				<div className='flex-1 '>
+					<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4'>
+						{filteredGroups.map(group => (
 							<div
-								key={reporterType}
-								className='bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow cursor-pointer'
-								onClick={() => onFilter(reporterType)}
+								key={group._id}
+								onClick={() => handleGroupClick(group)}
+								className='bg-white rounded-xl p-5 shadow hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-100 hover:scale-[1.02] group'
 							>
-								<div className='flex items-center justify-between'>
+								<div className='flex justify-between items-start mb-4'>
 									<div>
-										<p className='text-sm font-medium text-gray-600'>
-											{REPORTER_CONFIG[reporterType].text}
-										</p>
-										<p
-											className={`text-3xl font-bold ${REPORTER_CONFIG[reporterType].countTextClass}`}
-										>
-											{count}
-										</p>
+										<h3 className='font-bold text-lg text-gray-900 mb-1 group-hover:text-blue-600 transition-colors'>
+											{group.name}
+										</h3>
+										<p className='text-gray-600 text-sm'>{group.course}</p>
 									</div>
-									<div
-										className={`p-3 rounded-full ${REPORTER_CONFIG[reporterType].dotClass}`}
-									>
-										{REPORTER_CONFIG[reporterType].icon}
+									<div className='bg-gradient-to-br from-blue-100 to-indigo-100 p-2 rounded-xl group-hover:from-blue-200 group-hover:to-indigo-200 transition-all'>
+										<Code size={24} className='text-blue-600' />
+									</div>
+								</div>
+
+								<div className='space-y-2'>
+									<div className='flex items-center gap-2 text-gray-700 text-sm'>
+										<div className='bg-blue-50 p-1 rounded-lg'>
+											<Clock size={14} className='text-blue-600' />
+										</div>
+										<span className='font-medium'>
+											{group.start_time} - {group.end_time}
+										</span>
+									</div>
+
+									<div className='flex items-center gap-2 text-gray-700 text-sm'>
+										<div className='bg-blue-50 p-1 rounded-lg'>
+											<User size={14} className='text-blue-600' />
+										</div>
+										<span className='font-medium'>
+											{group.teacher_fullName || '—'}
+										</span>
+									</div>
+
+									<div className='flex items-center gap-2 text-gray-700 text-sm'>
+										<div className='bg-blue-50 p-1 rounded-lg'>
+											<Users size={14} className='text-blue-600' />
+										</div>
+										<span className='font-medium'>
+											{group.students?.length || 0} o'quvchi
+										</span>
+									</div>
+
+									<div className='pt-2 mt-2 border-t border-gray-100'>
+										<span className='inline-block bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 px-3 py-1 rounded-xl text-xs font-semibold'>
+											{formatDays(group.days)}
+										</span>
 									</div>
 								</div>
 							</div>
 						))}
 					</div>
-				</div>
 
-				{/* Main Layout: Left + Right */}
-				<div className='grid grid-cols-12 gap-6'>
-					{/* Left Side - Problems List */}
-					<div className='col-span-8'>
-						{/* Search */}
-						<div className='flex flex-col md:flex-row gap-4 mb-6'>
-							<div className='relative flex-1'>
-								<Search className='w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2' />
-								<input
-									type='text'
-									placeholder="Ism, sarlavha, kategoriya yoki ID bo'yicha qidirish..."
-									className='w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500'
-									value={search}
-									onChange={onSearch}
-								/>
-							</div>
+					{filteredGroups.length === 0 && (
+						<div className='text-center py-12 h-full flex flex-col items-center justify-center'>
+							<Users size={48} className='mx-auto text-gray-300 mb-3' />
+							<p className='text-base text-gray-500'>Guruhlar topilmadi</p>
 						</div>
-
-						{/* Problems List */}
-						{filteredSorted.length === 0 ? (
-							<div className='bg-white rounded-2xl shadow-lg p-12 text-center border border-gray-100'>
-								<MessageSquare className='w-16 h-16 text-gray-300 mx-auto mb-4' />
-								<h3 className='text-xl font-semibold text-gray-600 mb-2'>
-									Muammolar topilmadi
-								</h3>
-								<p className='text-gray-500'>
-									Qidiruv yoki filterni o'zgartirib ko'ring.
-								</p>
-							</div>
-						) : (
-							<>
-								<div className='space-y-4'>
-									{pagedItems.map(item => {
-										const id = getId(item)
-										const studentName =
-											item.studentName ||
-											item.student?.full_name ||
-											item.reporterName ||
-											"Noma'lum"
-										const created =
-											item.created_at || item.createdAt || item.date
-										const isDragging = draggedItem && getId(draggedItem) === id
-
-										return (
-											<div
-												key={id}
-												draggable
-												onDragStart={e => handleDragStart(e, item)}
-												onDragEnd={handleDragEnd}
-												className={`bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group cursor-move ${
-													isDragging ? 'opacity-50 rotate-3 scale-95' : ''
-												}`}
-											>
-												<div className='p-6'>
-													<div className='flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-4'>
-														<div className='flex-1'>
-															<div className='flex items-center gap-3 mb-3'>
-																<div className='p-2 rounded-full group-hover:bg-blue-100 transition-colors bg-gray-100'>
-																	<User className='w-4 h-4 text-gray-600 group-hover:text-blue-600' />
-																</div>
-																<h3 className='text-lg font-bold text-gray-800'>
-																	{studentName}
-																</h3>
-															</div>
-															<div className='flex flex-wrap items-center gap-2 text-sm text-gray-600'>
-																<div className='flex items-center gap-1'>
-																	<Calendar className='w-3 h-3' />
-																	<span>{formatDate(created)}</span>
-																</div>
-																{item.title && (
-																	<div className='px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium'>
-																		{item.title}
-																	</div>
-																)}
-																{item.category && (
-																	<div className='px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium'>
-																		{item.category}
-																	</div>
-																)}
-															</div>
-														</div>
-													</div>
-
-													<div className='mb-4'>
-														<div className='bg-gray-50 rounded-lg p-3 border-l-3 border-blue-500'>
-															<p className='text-gray-700 text-sm leading-relaxed'>
-																{safeString(item.description) || '—'}
-															</p>
-														</div>
-													</div>
-
-													<div className='flex justify-between items-center text-xs text-gray-500'>
-														<div className='flex gap-3'>
-															{item.phone && (
-																<div className='flex items-center gap-1'>
-																	<Phone className='w-3 h-3' />
-																	<span>{item.phone}</span>
-																</div>
-															)}
-															{item.email && (
-																<div className='flex items-center gap-1'>
-																	<Mail className='w-3 h-3' />
-																	<span>{item.email}</span>
-																</div>
-															)}
-														</div>
-														<span className='bg-gray-100 px-2 py-1 rounded'>
-															ID: #{id ?? '—'}
-														</span>
-													</div>
-												</div>
-											</div>
-										)
-									})}
-								</div>
-
-								{/* Pagination */}
-								<div className='mt-6 flex items-center justify-between'>
-									<div className='text-sm text-gray-600'>
-										Jami: {filteredSorted.length} | Sahifa {pageSafe} /{' '}
-										{totalPages}
-									</div>
-									<div className='flex gap-2'>
-										<button
-											onClick={() => goPage(Math.max(1, pageSafe - 1))}
-											disabled={pageSafe === 1}
-											className='px-3 py-2 rounded-lg border border-gray-200 bg-white disabled:opacity-50'
-										>
-											Oldingi
-										</button>
-										{Array.from({ length: totalPages }, (_, i) => i + 1)
-											.slice(
-												Math.max(0, pageSafe - 3),
-												Math.max(0, pageSafe - 3) + 5
-											)
-											.map(p => (
-												<button
-													key={p}
-													onClick={() => goPage(p)}
-													className={`px-3 py-2 rounded-lg border border-gray-200 ${
-														p === pageSafe
-															? 'bg-blue-600 text-white border-blue-600'
-															: 'bg-white hover:bg-gray-50'
-													}`}
-												>
-													{p}
-												</button>
-											))}
-										<button
-											onClick={() => goPage(Math.min(totalPages, pageSafe + 1))}
-											disabled={pageSafe === totalPages}
-											className='px-3 py-2 rounded-lg border border-gray-200 bg-white disabled:opacity-50'
-										>
-											Keyingi
-										</button>
-									</div>
-								</div>
-							</>
-						)}
-					</div>
-
-					{/* Right Side - Operators */}
-					<div className='col-span-4'>
-						<h2 className='text-2xl font-bold text-gray-800 mb-6'>Операторы</h2>
-
-						{/* Admins */}
-						<div className='mb-8'>
-							<h3 className='text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2'>
-								<Shield className='w-5 h-5' />
-								Админы
-							</h3>
-							<div className='space-y-3'>
-								{admins.map(admin => {
-									const adminId = getId(admin)
-									const isActive = draggedItem && dragOverTarget === adminId
-
-									return (
-										<div
-											key={adminId}
-											onDragOver={e => handleDragOver(e, admin)}
-											onDragLeave={handleDragLeave}
-											onDrop={e => handleDrop(e, admin)}
-											className={`bg-white rounded-lg p-4 border-2 border-dashed transition-all duration-200 cursor-pointer transform ${
-												isActive
-													? 'border-purple-500 bg-purple-100 shadow-lg scale-105 ring-2 ring-purple-200'
-													: draggedItem
-													? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:bg-purple-100'
-													: 'border-gray-200 hover:border-purple-400 hover:bg-purple-50'
-											}`}
-										>
-											<div className='flex items-center gap-3'>
-												<div
-													className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-														isActive ? 'bg-purple-200' : 'bg-purple-100'
-													}`}
-												>
-													<Shield
-														className={`w-4 h-4 ${
-															isActive ? 'text-purple-700' : 'text-purple-600'
-														}`}
-													/>
-												</div>
-												<div className='flex-1 min-w-0'>
-													<p
-														className={`font-medium truncate transition-colors ${
-															isActive ? 'text-purple-900' : 'text-gray-900'
-														}`}
-													>
-														{admin.fullName}
-													</p>
-													<p
-														className={`text-sm capitalize transition-colors ${
-															isActive ? 'text-purple-700' : 'text-purple-600'
-														}`}
-													>
-														{admin.role}
-													</p>
-												</div>
-												{isActive && (
-													<div className='w-2 h-2 bg-purple-500 rounded-full animate-pulse'></div>
-												)}
-											</div>
-										</div>
-									)
-								})}
-							</div>
-						</div>
-
-						{/* Teachers */}
-						<div>
-							<h3 className='text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2'>
-								<GraduationCap className='w-5 h-5' />
-								Учителя
-							</h3>
-							<div className='space-y-3'>
-								{teachers.map(teacher => {
-									const teacherId = getId(teacher)
-									const isActive = draggedItem && dragOverTarget === teacherId
-
-									return (
-										<div
-											key={teacherId}
-											onDragOver={e => handleDragOver(e, teacher)}
-											onDragLeave={handleDragLeave}
-											onDrop={e => handleDrop(e, teacher)}
-											className={`bg-white rounded-lg p-4 border-2 border-dashed transition-all duration-200 cursor-pointer transform ${
-												isActive
-													? 'border-green-500 bg-green-100 shadow-lg scale-105 ring-2 ring-green-200'
-													: draggedItem
-													? 'border-green-300 bg-green-50 hover:border-green-400 hover:bg-green-100'
-													: 'border-gray-200 hover:border-green-400 hover:bg-green-50'
-											}`}
-										>
-											<div className='flex items-center gap-3'>
-												<div
-													className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-														isActive ? 'bg-green-200' : 'bg-green-100'
-													}`}
-												>
-													<GraduationCap
-														className={`w-4 h-4 ${
-															isActive ? 'text-green-700' : 'text-green-600'
-														}`}
-													/>
-												</div>
-												<div className='flex-1 min-w-0'>
-													<p
-														className={`font-medium truncate transition-colors ${
-															isActive ? 'text-green-900' : 'text-gray-900'
-														}`}
-													>
-														{teacher.fullName}
-													</p>
-													<p
-														className={`text-sm capitalize transition-colors ${
-															isActive ? 'text-green-700' : 'text-green-600'
-														}`}
-													>
-														{teacher.role}
-													</p>
-												</div>
-												{isActive && (
-													<div className='w-2 h-2 bg-green-500 rounded-full animate-pulse'></div>
-												)}
-											</div>
-										</div>
-									)
-								})}
-							</div>
-						</div>
-
-						{/* Drag Instructions */}
-						{draggedItem && (
-							<div className='mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 animate-pulse'>
-								<div className='flex items-center gap-2 text-blue-800'>
-									<UserCheck className='w-4 h-4' />
-									<p className='text-sm font-medium'>
-										Перетащите проблему на оператора для назначения
-									</p>
-								</div>
-							</div>
-						)}
-
-						{/* Loading indicator for assignment */}
-						{assignLoading && (
-							<div className='mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200'>
-								<div className='flex items-center gap-2 text-yellow-800'>
-									<div className='animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600'></div>
-									<p className='text-sm font-medium'>Назначение проблемы...</p>
-								</div>
-							</div>
-						)}
-					</div>
+					)}
 				</div>
 			</div>
+
+			{showCreateModal && (
+				<div className='fixed inset-0 flex items-center justify-center z-50'>
+					<div
+						className='absolute inset-0 bg-black/50 backdrop-blur-sm'
+						onClick={() => {
+							setShowCreateModal(false)
+							resetForm()
+						}}
+					/>
+					<div className='relative bg-white rounded-xl shadow-lg w-[600px] max-h-[85vh] overflow-y-auto p-6 z-10'>
+						<button
+							onClick={() => {
+								setShowCreateModal(false)
+								resetForm()
+							}}
+							className='absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full transition-all'
+						>
+							<X size={20} />
+						</button>
+
+						<div className='mb-6'>
+							<h2 className='text-2xl font-bold text-gray-900 mb-1'>
+								Yangi guruh yaratish
+							</h2>
+							<p className='text-gray-600 text-sm'>
+								Barcha maydonlarni to'ldiring va yangi guruh yarating
+							</p>
+						</div>
+
+						<form onSubmit={handleSubmit} className='space-y-4'>
+							<div className='grid grid-cols-2 gap-4'>
+								<div>
+									<label className='block text-sm font-semibold text-gray-700 mb-1'>
+										Guruh nomi
+									</label>
+									<input
+										type='text'
+										value={newGroup.name}
+										onChange={e => handleInputChange('name', e.target.value)}
+										className='w-full px-3 py-2 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm'
+										placeholder='Masalan: Guruh 1'
+									/>
+								</div>
+
+								<div>
+									<label className='block text-sm font-semibold text-gray-700 mb-1'>
+										Kurs
+									</label>
+									<select
+										value={newGroup.courseId || newGroup.course}
+										onChange={e => handleCourseChange(e.target.value)}
+										className='w-full px-3 py-2 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm'
+									>
+										<option value=''>Kursni tanlang</option>
+										{isLoadingCourses ? (
+											<option value='' disabled>
+												Yuklanmoqda...
+											</option>
+										) : courses.length > 0 ? (
+											courses.map(c => (
+												<option
+													key={c._id || c.id || c.name}
+													value={c._id || c.id || c.name}
+												>
+													{c.name}
+												</option>
+											))
+										) : (
+											<option value='' disabled>
+												Kurslar topilmadi
+											</option>
+										)}
+									</select>
+								</div>
+							</div>
+
+							<div className='grid grid-cols-2 gap-4'>
+								<div>
+									<label className='block text-sm font-semibold text-gray-700 mb-1'>
+										O'qituvchi *
+									</label>
+									<select
+										value={newGroup.teacher}
+										onChange={e => handleTeacherChange(e.target.value)}
+										className='w-full px-3 py-2 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm'
+										required
+									>
+										<option value=''>O'qituvchini tanlang</option>
+										{isLoadingTeachers ? (
+											<option value='' disabled>
+												Yuklanmoqda...
+											</option>
+										) : teachers.length > 0 ? (
+											teachers.map(t => (
+												<option key={t._id} value={t._id}>
+													{t.fullName} {t.phone ? `(${t.phone})` : ''}
+												</option>
+											))
+										) : (
+											<option value='' disabled>
+												O'qituvchilar topilmadi
+											</option>
+										)}
+									</select>
+								</div>
+
+								<div>
+									<label className='block text-sm font-semibold text-gray-700 mb-1'>
+										Filial
+									</label>
+									<input
+										type='text'
+										value={newGroup.branch}
+										onChange={e => handleInputChange('branch', e.target.value)}
+										className='w-full px-3 py-2 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm'
+										placeholder='Masalan: Markaziy filial'
+									/>
+								</div>
+							</div>
+
+							<div className='grid grid-cols-2 gap-4'>
+								<div>
+									<label className='block text-sm font-semibold text-gray-700 mb-1'>
+										Boshlanish vaqti
+									</label>
+									<input
+										type='time'
+										value={newGroup.start_time}
+										onChange={e =>
+											handleInputChange('start_time', e.target.value)
+										}
+										className='w-full px-3 py-2 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm'
+									/>
+								</div>
+								<div>
+									<label className='block text-sm font-semibold text-gray-700 mb-1'>
+										Tugash vaqti
+									</label>
+									<input
+										type='time'
+										value={newGroup.end_time}
+										onChange={e =>
+											handleInputChange('end_time', e.target.value)
+										}
+										className='w-full px-3 py-2 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm'
+									/>
+								</div>
+							</div>
+
+							<div>
+								<label className='block text-sm font-semibold text-gray-700 mb-2'>
+									Dars kunlari
+								</label>
+								<div className='flex gap-3'>
+									<label className='flex items-center px-3 py-2 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-blue-500 transition-all text-sm'>
+										<input
+											type='radio'
+											name='days'
+											checked={newGroup.days.odd_days}
+											onChange={() => handleDaysChange('odd_days')}
+											className='mr-2 w-3 h-3'
+										/>
+										<span className='font-medium'>Toq kunlar</span>
+									</label>
+									<label className='flex items-center px-3 py-2 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-blue-500 transition-all text-sm'>
+										<input
+											type='radio'
+											name='days'
+											checked={newGroup.days.even_days}
+											onChange={() => handleDaysChange('even_days')}
+											className='mr-2 w-3 h-3'
+										/>
+										<span className='font-medium'>Juft kunlar</span>
+									</label>
+									<label className='flex items-center px-3 py-2 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-blue-500 transition-all text-sm'>
+										<input
+											type='radio'
+											name='days'
+											checked={newGroup.days.every_days}
+											onChange={() => handleDaysChange('every_days')}
+											className='mr-2 w-3 h-3'
+										/>
+										<span className='font-medium'>Har kuni</span>
+									</label>
+								</div>
+							</div>
+
+							<div>
+								<label className='block text-sm font-semibold text-gray-700 mb-1'>
+									Telegram chat ID
+								</label>
+								<input
+									type='text'
+									value={newGroup.telegramChatId}
+									onChange={e =>
+										handleInputChange('telegramChatId', e.target.value)
+									}
+									className='w-full px-3 py-2 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm'
+									placeholder='Masalan: grp_12345'
+								/>
+							</div>
+
+							<div className='flex justify-end gap-3 pt-4 border-t border-gray-200'>
+								<button
+									type='button'
+									onClick={() => {
+										setShowCreateModal(false)
+										resetForm()
+									}}
+									className='px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-semibold text-sm'
+								>
+									Bekor qilish
+								</button>
+								<button
+									type='submit'
+									disabled={isCreating}
+									className='bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-2 rounded-xl hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 font-semibold text-sm'
+								>
+									{isCreating ? 'Yaratilmoqda...' : 'Guruh yaratish'}
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			)}
 		</div>
 	)
 }
 
-export default Problems
+export default Guruhlar
