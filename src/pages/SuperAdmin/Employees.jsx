@@ -348,7 +348,7 @@ function Employees() {
             style={{ boxShadow: "0px 6px 12px 0px #3F8CFF43" }}
             className='max-[600px]:w-[100px] flex justify-center items-center bg-[#3F8CFF] text-white w-[179px] h-[48px] rounded-[14px] text-[16px] font-[700] font-[Nunito_sans]'
           >
-            + <p className='max-[600px]:hidden pl-[6px] pr-[6px]'>Add</p> Employee
+            + <p className='max-[600px]:hidden pl-[6px] pr-[6px]'>Xodim</p> qoshish
           </button>
         </div>
       </div>

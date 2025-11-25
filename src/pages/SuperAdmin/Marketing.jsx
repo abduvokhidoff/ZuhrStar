@@ -265,7 +265,7 @@ const Marketing = () => {
             >
               <div className="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
               <Plus className="w-5 h-5 relative z-10" />
-              <span className="relative z-10">Создать Lead</span>
+              <span className="relative z-10">Yangi Lead ochish</span>
             </button>
           </div>
 
@@ -278,7 +278,7 @@ const Marketing = () => {
                 </div>
                 <TrendingUp className="w-5 h-5 text-green-500" />
               </div>
-              <p className="text-gray-600 text-sm mb-1">Всего лидов</p>
+              <p className="text-gray-600 text-sm mb-1">Leadlar</p>
               {loading ? (
                 <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
               ) : (
@@ -293,7 +293,7 @@ const Marketing = () => {
                 </div>
                 <Calendar className="w-5 h-5 text-blue-500" />
               </div>
-              <p className="text-gray-600 text-sm mb-1">Сегодня</p>
+              <p className="text-gray-600 text-sm mb-1">Bugun</p>
               {loading ? (
                 <div className="h-8 w-12 bg-gray-200 rounded animate-pulse"></div>
               ) : (
@@ -329,7 +329,7 @@ const Marketing = () => {
                   <Filter className="w-6 h-6 text-white" />
                 </div>
               </div>
-              <p className="text-gray-600 text-sm mb-1">Активные</p>
+              <p className="text-gray-600 text-sm mb-1">Aktiv</p>
               {loading ? (
                 <div className="h-8 w-12 bg-gray-200 rounded animate-pulse"></div>
               ) : (
@@ -345,7 +345,7 @@ const Marketing = () => {
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Поиск по имени, телефону, email..."
+              placeholder="Ism boyicha, telefon, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
@@ -361,7 +361,7 @@ const Marketing = () => {
             <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="w-10 h-10 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Лиды не найдены</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Leadar topilmadi</h3>
             <p className="text-gray-500 mb-6">
               {searchTerm ? 'Попробуйте изменить параметры поиска' : 'Создайте первый лид, нажав кнопку выше'}
             </p>
@@ -411,7 +411,7 @@ const Marketing = () => {
                           className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
                         >
                           <Trash2 className="w-4 h-4" />
-                          Удалить
+                          Ochirish
                         </button>
                       </div>
                     )}
@@ -472,7 +472,7 @@ const Marketing = () => {
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white p-6 border-b border-gray-200 rounded-t-3xl z-10">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-900">Новый лид</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Yangi Lead</h2>
                 <button
                   onClick={() => setIsModalOpen(false)}
                   className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
@@ -485,7 +485,7 @@ const Marketing = () => {
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Источник</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Source</label>
                   <select
                     name="source"
                     value={formData.source}
@@ -501,7 +501,7 @@ const Marketing = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Имя</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Ism</label>
                   <input
                     type="text"
                     name="name"
@@ -513,7 +513,7 @@ const Marketing = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Телефон</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Telefon</label>
                   <input
                     type="tel"
                     name="phone"
@@ -549,7 +549,7 @@ const Marketing = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Реферер</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Referal</label>
                   <input
                     type="text"
                     name="referrer_user_id"
@@ -561,7 +561,7 @@ const Marketing = () => {
               </div>
 
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">UTM Параметры</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">UTM parametrlari</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input
                     type="text"
@@ -607,14 +607,14 @@ const Marketing = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Заметка</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Eslatma</label>
                 <textarea
                   name="note"
                   value={formData.note}
                   onChange={handleInputChange}
                   rows={3}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Дополнительная информация..."
+                  placeholder="Koproq ma'lumot..."
                 />
               </div>
 
@@ -624,7 +624,7 @@ const Marketing = () => {
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                 >
-                  Отмена
+                  Bekor qilish
                 </button>
                 <button
                   type="button"
@@ -632,7 +632,7 @@ const Marketing = () => {
                   disabled={creating}
                   className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl"
                 >
-                  {creating ? 'Создание...' : 'Создать лид'}
+                  {creating ? 'Ochilyapti...' : 'Lead ochish'}
                 </button>
               </div>
             </div>
@@ -650,19 +650,19 @@ const Marketing = () => {
                   <Trash2 className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Удалить лида</h3>
-                  <p className="text-sm text-gray-600">Это действие нельзя отменить</p>
+                  <h3 className="text-xl font-bold text-gray-900">Lead ochirish</h3>
+                  <p className="text-sm text-gray-600">Bu ishni orqaga qaytarib bolmaydi</p>
                 </div>
               </div>
 
               {leadToDelete && (
                 <div className="mb-6 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200">
                   <p className="text-sm text-gray-700 mb-2">
-                    <span className="font-semibold">Лид:</span> {leadToDelete.name}
+                    <span className="font-semibold">Lead:</span> {leadToDelete.name}
                   </p>
                   {leadToDelete.phone && (
                     <p className="text-sm text-gray-700">
-                      <span className="font-semibold">Телефон:</span> {leadToDelete.phone}
+                      <span className="font-semibold">Telefon:</span> {leadToDelete.phone}
                     </p>
                   )}
                 </div>
@@ -677,7 +677,7 @@ const Marketing = () => {
                   }}
                   className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                 >
-                  Отмена
+                  Bekor qilish
                 </button>
                 <button
                   type="button"
@@ -688,12 +688,12 @@ const Marketing = () => {
                   {deletingId ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Удаление...
+                      Ochirilmoqda...
                     </>
                   ) : (
                     <>
                       <Trash2 className="w-4 h-4" />
-                      Удалить
+                      Ochirish
                     </>
                   )}
                 </button>
