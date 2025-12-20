@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '../../redux/authSlice'
 
-const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+const API_BASE = 'https://zuhr-star-production.up.railway.app/api'
 
 const cx = (...a) => a.filter(Boolean).join(' ')
 const Btn = ({ as: Tag = 'button', className = '', ...p }) => (

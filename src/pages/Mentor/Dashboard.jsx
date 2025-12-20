@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useSelector } from 'react-redux'
 
 const Dashboard = () => {
 	const [studentsCount, setStudentsCount] = useState(0)
@@ -11,9 +12,8 @@ const Dashboard = () => {
 	const [selectedGroup, setSelectedGroup] = useState(null)
 	const [isModalOpen, setIsModalOpen] = useState(false)
 	const [salaries, setSalaries] = useState(0)
-	const AUTH_TOKEN =
-		'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4YTMyNTdkN2E4ZjEwMDdkMDExY2EyOCIsInJvbGUiOiJNZW50b3IiLCJpYXQiOjE3NjE2NTIzMzIsImV4cCI6MTc2MTY1OTUzMn0.HF6ChyqKfS1BlZOXqVuKHPkcqj_63k2J2P3zybCrg_0'
-	const BASE_URL = 'https://zuhrstar-production.up.railway.app/api'
+	const AUTH_TOKEN = useSelector(state => state.auth.accessToken)
+	const BASE_URL = 'https://zuhr-star-production.up.railway.app/api'
 	const TEACHER_NAME = 'Abduvohid Xoshimov'
 
 	useEffect(() => {

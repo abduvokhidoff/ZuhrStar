@@ -89,10 +89,10 @@ function Employees() {
 		setLoading(true)
 		try {
 			const [usersRes, teachersRes] = await Promise.all([
-				axios.get('https://zuhrstar-production.up.railway.app/api/users', {
+				axios.get('https://zuhr-star-production.up.railway.app/api/users', {
 					headers: { Authorization: `Bearer ${accessToken}` },
 				}),
-				axios.get('https://zuhrstar-production.up.railway.app/api/teachers', {
+				axios.get('https://zuhr-star-production.up.railway.app/api/teachers', {
 					headers: { Authorization: `Bearer ${accessToken}` },
 				}),
 			])
@@ -137,7 +137,7 @@ function Employees() {
 		setLoading(true)
 		try {
 			const res = await axios.get(
-				'https://zuhrstar-production.up.railway.app/api/users',
+				'https://zuhr-star-production.up.railway.app/api/users',
 				{
 					headers: { Authorization: `Bearer ${accessToken}` },
 				}
@@ -187,8 +187,8 @@ function Employees() {
 		if (showEditModal && selectedUser) {
 			const url =
 				selectedKind === 'teacher'
-					? `https://zuhrstar-production.up.railway.app/api/teachers/${selectedId}`
-					: `https://zuhrstar-production.up.railway.app/api/users/${selectedId}`
+					? `https://zuhr-star-production.up.railway.app/api/teachers/${selectedId}`
+					: `https://zuhr-star-production.up.railway.app/api/users/${selectedId}`
 
 			await axios.put(url, formData, {
 				headers: { Authorization: `Bearer ${accessToken}` },
@@ -209,7 +209,7 @@ function Employees() {
 
 		if (role === 'admin' || role === 'superadmin') {
 			// Для users/register - только основные поля
-			endpoint = 'https://zuhrstar-production.up.railway.app/api/users/register'
+			endpoint = 'https://zuhr-star-production.up.railway.app/api/users/register'
 			apiData = {
 				fullName: formData.fullName,
 				phone: formData.phone,
@@ -222,7 +222,7 @@ function Employees() {
 		} else {
 			// Для teachers/register - добавляем дополнительные поля автоматически
 			endpoint =
-				'https://zuhrstar-production.up.railway.app/api/teachers/register'
+				'https://zuhr-star-production.up.railway.app/api/teachers/register'
 			apiData = {
 				fullName: formData.fullName,
 				phone: formData.phone,
@@ -319,8 +319,8 @@ function Employees() {
 
 		const url =
 			selectedKind === 'teacher'
-				? `https://zuhrstar-production.up.railway.app/api/teachers/${selectedId}`
-				: `https://zuhrstar-production.up.railway.app/api/users/${selectedId}`
+				? `https://zuhr-star-production.up.railway.app/api/teachers/${selectedId}`
+				: `https://zuhr-star-production.up.railway.app/api/users/${selectedId}`
 
 		await axios.delete(url, {
 			headers: { Authorization: `Bearer ${accessToken}` },

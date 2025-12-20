@@ -14,7 +14,7 @@ const Yigilish = () => {
 			setLoading(true)
 			try {
 				const res = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/groups',
+					'https://zuhr-star-production.up.railway.app/api/groups',
 					{
 						method: 'GET',
 						headers: {

@@ -58,7 +58,7 @@ const UnifiedCourses = () => {
 			setError(null)
 
 			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/courses',
+				'https://zuhr-star-production.up.railway.app/api/courses',
 				{
 					method: 'GET',
 					headers: config.headers,
@@ -90,7 +90,7 @@ const UnifiedCourses = () => {
 			try {
 				setLoading(true)
 				const response = await fetch(
-					`https://zuhrstar-production.up.railway.app/api/courses/id/${courseId}`,
+					`https://zuhr-star-production.up.railway.app/api/courses/id/${courseId}`,
 					{
 						headers: config.headers,
 					}
@@ -119,7 +119,7 @@ const UnifiedCourses = () => {
 			try {
 				setLoading(true)
 				const response = await fetch(
-					`https://zuhrstar-production.up.railway.app/api/courses/id/${courseId}`,
+					`https://zuhr-star-production.up.railway.app/api/courses/id/${courseId}`,
 					{
 						method: 'PUT',
 						headers: config.headers,
@@ -152,7 +152,7 @@ const UnifiedCourses = () => {
 			try {
 				setLoading(true)
 				const response = await fetch(
-					`https://zuhrstar-production.up.railway.app/api/courses/id/${courseId}`,
+					`https://zuhr-star-production.up.railway.app/api/courses/id/${courseId}`,
 					{
 						method: 'DELETE',
 						headers: config.headers,

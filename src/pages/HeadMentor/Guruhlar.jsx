@@ -15,7 +15,7 @@ import {
 	User,
 } from 'lucide-react'
 
-const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+const API_BASE = 'https://zuhr-star-production.up.railway.app/api'
 
 // === Yordamchi funksiyalar ===
 const gid = g => String(g?.group_id ?? g?.id ?? g?._id ?? '')

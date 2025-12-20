@@ -39,7 +39,7 @@ const Kurslar = () => {
 	const { accessToken, refreshToken } = useSelector(state => state.auth)
 
 	// API base URL
-	const API_BASE_URL = 'https://zuhrstar-production.up.railway.app/api'
+	const API_BASE_URL = 'https://zuhr-star-production.up.railway.app/api'
 
 	// Function to refresh the access token
 	const refreshAccessToken = async () => {

@@ -137,7 +137,7 @@ const Marketing = () => {
 		try {
 			setLoading(true)
 			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/leads/all',
+				'https://zuhr-star-production.up.railway.app/api/leads/all',
 				{
 					method: 'GET',
 					headers: {
@@ -175,7 +175,7 @@ const Marketing = () => {
 		try {
 			setCreating(true)
 			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/leads/intake',
+				'https://zuhr-star-production.up.railway.app/api/leads/intake',
 				{
 					method: 'POST',
 					headers: {
@@ -218,7 +218,7 @@ const Marketing = () => {
 		try {
 			setDeletingId(leadToDelete._id || leadToDelete.id)
 			const response = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/leads/${
+				`https://zuhr-star-production.up.railway.app/api/leads/${
 					leadToDelete._id || leadToDelete.id
 				}`,
 				{

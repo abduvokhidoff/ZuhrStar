@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { setCredentials, logout } from '../../redux/authSlice'
 
-const API = 'https://zuhrstar-production.up.railway.app/api'
+const API = 'https://zuhr-star-production.up.railway.app/api'
 
 const Avatar = ({ src, alt, size = 80 }) => (
 	<div

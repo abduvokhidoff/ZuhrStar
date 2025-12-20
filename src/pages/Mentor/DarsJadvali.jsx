@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { BookOpen, ArrowLeft, GraduationCap, Clock, DollarSign, Calendar, CheckCircle2 } from 'lucide-react';
 
-const API_BASE = 'https://zuhrstar-production.up.railway.app/api';
+const API_BASE = 'https://zuhr-star-production.up.railway.app/api';
 const COURSE_FILTER_NAME = 'Front-end';
 
 export default function DarsJadvali() {

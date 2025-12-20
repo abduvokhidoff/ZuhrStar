@@ -42,7 +42,7 @@ const JadvalniKorish = () => {
 		setIsRefreshing(true)
 		try {
 			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/users/refresh',
+				'https://zuhr-star-production.up.railway.app/api/users/refresh',
 				{
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -76,7 +76,7 @@ const JadvalniKorish = () => {
 			if (!token) throw new Error('Нет accessToken')
 
 			let response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/groups/',
+				'https://zuhr-star-production.up.railway.app/api/groups/',
 				{
 					method: 'GET',
 					headers: { Authorization: `Bearer ${token}` },
@@ -87,7 +87,7 @@ const JadvalniKorish = () => {
 				const newToken = await refreshAccessToken()
 				if (!newToken) throw new Error('Не удалось обновить accessToken')
 				response = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/groups/',
+					'https://zuhr-star-production.up.railway.app/api/groups/',
 					{
 						method: 'GET',
 						headers: { Authorization: `Bearer ${newToken}` },

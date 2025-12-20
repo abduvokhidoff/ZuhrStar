@@ -99,7 +99,7 @@ const Guruhlar = () => {
 	const fetchTeachers = async token => {
 		try {
 			const res = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/teachers',
+				'https://zuhr-star-production.up.railway.app/api/teachers',
 				{
 					headers: {
 						Authorization: `Bearer ${token}`,
@@ -110,7 +110,7 @@ const Guruhlar = () => {
 
 			if (res.status === 401) {
 				const refreshRes = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					'https://zuhr-star-production.up.railway.app/api/users/refresh',
 					{
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -143,7 +143,7 @@ const Guruhlar = () => {
 	const fetchCourses = async token => {
 		try {
 			const res = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/courses',
+				'https://zuhr-star-production.up.railway.app/api/courses',
 				{
 					headers: {
 						Authorization: `Bearer ${token}`,
@@ -154,7 +154,7 @@ const Guruhlar = () => {
 
 			if (res.status === 401) {
 				const refreshRes = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					'https://zuhr-star-production.up.railway.app/api/users/refresh',
 					{
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -187,7 +187,7 @@ const Guruhlar = () => {
 	const fetchGroups = async token => {
 		try {
 			const res = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/groups',
+				'https://zuhr-star-production.up.railway.app/api/groups',
 				{
 					headers: {
 						Authorization: `Bearer ${token}`,
@@ -198,7 +198,7 @@ const Guruhlar = () => {
 
 			if (res.status === 401) {
 				const refreshRes = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					'https://zuhr-star-production.up.railway.app/api/users/refresh',
 					{
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -224,7 +224,7 @@ const Guruhlar = () => {
 		setIsLoadingAttendance(true)
 		try {
 			const res = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/attendance?groupId=${groupId}`,
+				`https://zuhr-star-production.up.railway.app/api/attendance?groupId=${groupId}`,
 				{
 					headers: {
 						Authorization: `Bearer ${token}`,
@@ -235,7 +235,7 @@ const Guruhlar = () => {
 
 			if (res.status === 401) {
 				const refreshRes = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					'https://zuhr-star-production.up.railway.app/api/users/refresh',
 					{
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -263,7 +263,7 @@ const Guruhlar = () => {
 	const markAttendance = async (studentId, date, status) => {
 		try {
 			const res = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/attendance',
+				'https://zuhr-star-production.up.railway.app/api/attendance',
 				{
 					method: 'POST',
 					headers: {
@@ -354,14 +354,14 @@ const Guruhlar = () => {
 			let { res, parsed, rawText } = await postGroup(
 				token,
 				payload,
-				'https://zuhrstar-production.up.railway.app/api/groups'
+				'https://zuhr-star-production.up.railway.app/api/groups'
 			)
 
 			if (res.status === 404) {
 				const second = await postGroup(
 					token,
 					payload,
-					'https://zuhrstar-production.up.railway.app/api/groups/'
+					'https://zuhr-star-production.up.railway.app/api/groups/'
 				)
 				res = second.res
 				parsed = second.parsed
@@ -370,7 +370,7 @@ const Guruhlar = () => {
 
 			if (res.status === 401) {
 				const refreshRes = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/users/refresh',
+					'https://zuhr-star-production.up.railway.app/api/users/refresh',
 					{
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },

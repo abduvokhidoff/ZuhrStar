@@ -77,7 +77,7 @@ const Oquvchilar = () => {
 			setLoading(true)
 			setError('')
 			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/students',
+				'https://zuhr-star-production.up.railway.app/api/students',
 				{
 					method: 'GET',
 					headers: {
@@ -166,7 +166,7 @@ const Oquvchilar = () => {
 
 		try {
 			const response = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/students/${studentId}`,
+				`https://zuhr-star-production.up.railway.app/api/students/${studentId}`,
 				{
 					method: 'DELETE',
 					headers: {
@@ -298,7 +298,7 @@ const Oquvchilar = () => {
 			}
 
 			const response = await fetch(
-				`https://zuhrstar-production.up.railway.app/api/students/${student_id}`,
+				`https://zuhr-star-production.up.railway.app/api/students/${student_id}`,
 				{
 					method: 'PUT',
 					headers: {
@@ -406,7 +406,7 @@ const Oquvchilar = () => {
 			}
 
 			const response = await fetch(
-				'https://zuhrstar-production.up.railway.app/api/students',
+				'https://zuhr-star-production.up.railway.app/api/students',
 				{
 					method: 'POST',
 					headers: {

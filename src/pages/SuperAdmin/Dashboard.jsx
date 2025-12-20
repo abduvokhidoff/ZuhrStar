@@ -144,7 +144,7 @@ const Dashboard = () => {
 		const fetchUsers = async () => {
 			try {
 				const res = await axios.get(
-					'https://zuhrstar-production.up.railway.app/api/users',
+					'https://zuhr-star-production.up.railway.app/api/users',
 					{
 						headers: { Authorization: `Bearer ${accessToken}` },
 						signal: controller.signal,
@@ -169,7 +169,7 @@ const Dashboard = () => {
 		const fetchTeachers = async () => {
 			try {
 				const res = await axios.get(
-					'https://zuhrstar-production.up.railway.app/api/teachers',
+					'https://zuhr-star-production.up.railway.app/api/teachers',
 					{
 						headers: { Authorization: `Bearer ${accessToken}` },
 						signal: controller.signal,
@@ -198,7 +198,7 @@ const Dashboard = () => {
 		const fetchChecks = async () => {
 			try {
 				const res = await axios.get(
-					'https://zuhrstar-production.up.railway.app/api/checks',
+					'https://zuhr-star-production.up.railway.app/api/checks',
 					{
 						headers: { Authorization: `Bearer ${accessToken}` },
 						signal: controller.signal,
@@ -221,7 +221,7 @@ const Dashboard = () => {
 					studentIds.map(async studentId => {
 						try {
 							const studentRes = await axios.get(
-								`https://zuhrstar-production.up.railway.app/api/students/${studentId}`,
+								`https://zuhr-star-production.up.railway.app/api/students/${studentId}`,
 								{
 									headers: { Authorization: `Bearer ${accessToken}` },
 									signal: controller.signal,
@@ -251,7 +251,7 @@ const Dashboard = () => {
 		if (!accessToken) return
 		const controller = new AbortController()
 		axios
-			.get('https://zuhrstar-production.up.railway.app/api/students', {
+			.get('https://zuhr-star-production.up.railway.app/api/students', {
 				headers: { Authorization: `Bearer ${accessToken}` },
 				signal: controller.signal,
 			})
@@ -273,7 +273,7 @@ const Dashboard = () => {
 		if (!accessToken) return
 		const controller = new AbortController()
 		axios
-			.get('https://zuhrstar-production.up.railway.app/api/groups', {
+			.get('https://zuhr-star-production.up.railway.app/api/groups', {
 				headers: { Authorization: `Bearer ${accessToken}` },
 				signal: controller.signal,
 			})
@@ -294,7 +294,7 @@ const Dashboard = () => {
 		if (!accessToken) return
 		const controller = new AbortController()
 		axios
-			.get('https://zuhrstar-production.up.railway.app/api/courses', {
+			.get('https://zuhr-star-production.up.railway.app/api/courses', {
 				headers: { Authorization: `Bearer ${accessToken}` },
 				signal: controller.signal,
 			})

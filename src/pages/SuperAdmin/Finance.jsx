@@ -16,7 +16,7 @@ import {
 	Line,
 } from 'recharts'
 
-const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+const API_BASE = 'https://zuhr-star-production.up.railway.app/api'
 const REFRESH_URL = `${API_BASE}/auth/refresh`
 
 // ---- Enhanced API client with better refresh token handling ----

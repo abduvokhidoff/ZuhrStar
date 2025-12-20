@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { setCredentials, logout } from "../../redux/authSlice";
 import { Users, BookOpen, Calendar, AlertTriangle, RefreshCw, Check, X, GraduationCap, ChevronDown, Loader2 } from "lucide-react";
 
-const API_BASE = "https://zuhrstar-production.up.railway.app/api";
+const API_BASE = "https://zuhr-star-production.up.railway.app/api";
 
 const A = (v) => (Array.isArray(v?.data) ? v.data : Array.isArray(v) ? v : []);
 const gid = (g) => String(g?.group_id ?? g?.id ?? g?._id ?? "");

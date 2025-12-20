@@ -116,19 +116,19 @@ const Dashboard = () => {
 				setLoading(true)
 				const [teachersRes, groupsRes, studentsRes, attendanceRes] =
 					await Promise.all([
-						fetch('https://zuhrstar-production.up.railway.app/api/teachers', {
+						fetch('https://zuhr-star-production.up.railway.app/api/teachers', {
 							headers,
 							signal: controller.signal,
 						}),
-						fetch('https://zuhrstar-production.up.railway.app/api/groups', {
+						fetch('https://zuhr-star-production.up.railway.app/api/groups', {
 							headers,
 							signal: controller.signal,
 						}),
-						fetch('https://zuhrstar-production.up.railway.app/api/students', {
+						fetch('https://zuhr-star-production.up.railway.app/api/students', {
 							headers,
 							signal: controller.signal,
 						}),
-						fetch('https://zuhrstar-production.up.railway.app/api/attendance', {
+						fetch('https://zuhr-star-production.up.railway.app/api/attendance', {
 							headers,
 							signal: controller.signal,
 						}),

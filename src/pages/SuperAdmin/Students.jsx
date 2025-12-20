@@ -67,7 +67,7 @@ const Oquvchilar = () => {
 
 	const [updateMessage, setUpdateMessage] = useState({ text: '', type: '' })
 
-	const API_BASE = 'https://zuhrstar-production.up.railway.app/api'
+	const API_BASE = 'https://zuhr-star-production.up.railway.app/api'
 
 	const authGuard = response => {
 		if (response.status === 401) {

@@ -32,7 +32,7 @@ const Sozlamalar = () => {
 		const fetchUsers = async () => {
 			try {
 				const res = await fetch(
-					'https://zuhrstar-production.up.railway.app/api/teachers',
+					'https://zuhr-star-production.up.railway.app/api/teachers',
 					{
 						headers: {
 							Authorization: `Bearer ${accessToken}`,
