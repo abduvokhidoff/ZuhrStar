@@ -33,7 +33,7 @@ const LoginLayout = () => {
 		setError('')
 		try {
 			const res = await axios.post(
-				'https://zuhrstar-production.up.railway.app/api/auth/login',
+				'https://zuhr-star-production.up.railway.app/api/auth/login',
 				{
 					phone: phoneNumber,
 					password: password,

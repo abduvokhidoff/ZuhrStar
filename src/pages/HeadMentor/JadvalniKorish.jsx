@@ -29,7 +29,7 @@ const JadvalniKorish = () => {
 	// === Static 12 rooms ===
 	const ROOMS = Array.from({ length: 12 }, (_, i) => ({
 		id: i + 1,
-		name: `Хона ${i + 1}`,
+		name: `Xona ${i + 1}`,
 		color: i % 2 === 0 ? 'bg-blue-50' : 'bg-green-50',
 	}))
 
@@ -229,20 +229,6 @@ const JadvalniKorish = () => {
 	return (
 		<div className='min-h-screen bg-gray-50 p-4' onMouseMove={handleMouseMove}>
 			<div className='max-w-7xl mx-auto bg-white rounded-lg shadow-sm'>
-				{/* Header */}
-				<div className='flex items-center justify-between p-6 border-b border-gray-200'>
-					<h1 className='text-xl font-medium text-gray-700'>
-						Dashboard HeadMentor
-					</h1>
-					<button
-						onClick={handleRefresh}
-						className='p-2 text-gray-400 hover:text-gray-600'
-					>
-						<RefreshCw
-							className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
-						/>
-					</button>
-				</div>
 
 				{/* DAY FILTERS (No Sunday) */}
 				<div className='bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200 px-6 py-4'>

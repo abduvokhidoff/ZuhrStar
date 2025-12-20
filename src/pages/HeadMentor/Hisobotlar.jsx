@@ -261,18 +261,18 @@ const Hisobotlar = () => {
 		})
 
 		const labels = [
-			'Jan',
-			'Feb',
-			'Mar',
-			'Apr',
+			'Yanvar',
+			'Fevral',
+			'Mart',
+			'Aprel',
 			'May',
-			'Jun',
-			'Jul',
-			'Aug',
-			'Sep',
-			'Oct',
-			'Nov',
-			'Dec',
+			'Iyun',
+			'Iyul',
+			'Avgust',
+			'Sentabr',
+			'Oktabr',
+			'Noyabr',
+			'Dekabr',
 		]
 
 		return months.map((m, idx) => ({ month: labels[idx], total: m.total }))
@@ -430,7 +430,7 @@ const Hisobotlar = () => {
 
 	// ---------- JSX (kept UI/layout similar to your original) ----------
 	return (
-		<div className='min-h-screen bg-gray-50'>
+		<div className='min-h-screen'>
 			<div className='bg-white border-b border-gray-200'>
 				<div className='px-8 py-4'>
 					<div className='flex items-center justify-between'>
@@ -454,7 +454,7 @@ const Hisobotlar = () => {
 							))}
 						</div>
 						<div className='text-sm text-gray-500'>
-							<label className='mr-3 text-xs text-gray-600'>Show:</label>
+							<label className='mr-3 text-xs text-gray-600'>Sana:</label>
 							<select
 								value={showOnlyThisMonth ? 'thisMonth' : 'all'}
 								onChange={e =>
@@ -462,8 +462,8 @@ const Hisobotlar = () => {
 								}
 								className='px-2 py-1 border rounded'
 							>
-								<option value='thisMonth'>This month (this year)</option>
-								<option value='all'>All payments</option>
+								<option value='thisMonth'>Hozirgi oy (Hozirgi yil)</option>
+								<option value='all'>Barcha to'lovlar</option>
 							</select>
 						</div>
 					</div>

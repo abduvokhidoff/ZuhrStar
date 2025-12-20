@@ -426,7 +426,7 @@ const Guruhlar = () => {
 	// === YUKLANMOQDA ===
 	if (isLoading.boot) {
 		return (
-			<div className='min-h-screen bg-gray-50 flex items-center justify-center'>
+			<div className='min-h-screen flex items-center justify-center'>
 				<Loader2 className='w-8 h-8 animate-spin text-[#0066CC]' />
 			</div>
 		)
@@ -435,7 +435,7 @@ const Guruhlar = () => {
 	// === GURUHLAR RO'YXATI ===
 	if (!selectedGroup) {
 		return (
-			<div className='min-h-screen bg-gray-50 px-6 py-8'>
+			<div className='min-h-screen px-6 py-8'>
 				<div className='flex justify-between items-center mb-6'>
 					<div>
 						<h1 className='text-3xl font-bold text-gray-900'>Guruhlar</h1>
@@ -511,7 +511,7 @@ const Guruhlar = () => {
 
 	// === DAVOMAT JADVALI ===
 	return (
-		<div className='h-screen bg-[#F5F7FA] flex flex-col overflow-hidden'>
+		<div className='h-screen  flex flex-col overflow-hidden'>
 			{/* Header with back button */}
 			<div className='bg-white border-b shadow-sm flex-shrink-0'>
 				<div className='max-w-7xl mx-auto px-6 py-4 flex items-center justify-between'>

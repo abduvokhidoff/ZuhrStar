@@ -1,6 +1,20 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSelector } from 'react-redux';
-import { Plus, BookOpen, Users, Calendar, CheckCircle, Clock, Star, Zap, AlertCircle, ArrowLeft, Edit, Trash2, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useSelector } from 'react-redux'
+import {
+	Plus,
+	BookOpen,
+	Users,
+	Calendar,
+	CheckCircle,
+	Clock,
+	Star,
+	Zap,
+	AlertCircle,
+	ArrowLeft,
+	Edit,
+	Trash2,
+	X,
+} from 'lucide-react'
 
 const UnifiedCourses = () => {
 	const { accessToken, user } = useSelector(state => state.auth)
@@ -31,10 +45,10 @@ const UnifiedCourses = () => {
 		[accessToken]
 	)
 
-	// Мемоизированные функции API
+	// Memosizatsiyalangan API funksiyalar
 	const fetchCourses = useCallback(async () => {
 		if (!accessToken) {
-			setError('Токен авторизации отсутствует')
+			setError('Avtorizatsiya tokeni mavjud emas')
 			setDataLoading(false)
 			return
 		}
@@ -52,18 +66,18 @@ const UnifiedCourses = () => {
 			)
 
 			if (response.status === 401) {
-				throw new Error('Ошибка авторизации. Проверьте токен доступа.')
+				throw new Error('Avtorizatsiya xatosi. Kirish tokenini tekshiring.')
 			}
 
 			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`)
+				throw new Error(`HTTP xato! status: ${response.status}`)
 			}
 
 			const data = await response.json()
 			setCourses(data)
 		} catch (error) {
-			console.error('Error fetching courses:', error)
-			setError('Не удалось загрузить курсы. Проверьте подключение к интернету.')
+			console.error('Kurslarni yuklashda xato:', error)
+			setError("Kurslarni yuklab bo'lmadi. Internet aloqasini tekshiring.")
 		} finally {
 			setDataLoading(false)
 		}
@@ -83,14 +97,14 @@ const UnifiedCourses = () => {
 				)
 
 				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`)
+					throw new Error(`HTTP xato! status: ${response.status}`)
 				}
 
 				const data = await response.json()
 				setSelectedCourse(data)
 			} catch (error) {
-				console.error('Error fetching course:', error)
-				setError('Не удалось загрузить курс')
+				console.error('Kursni yuklashda xato:', error)
+				setError("Kursni yuklab bo'lmadi")
 			} finally {
 				setLoading(false)
 			}
@@ -114,7 +128,7 @@ const UnifiedCourses = () => {
 				)
 
 				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`)
+					throw new Error(`HTTP xato! status: ${response.status}`)
 				}
 
 				const data = await response.json()
@@ -122,8 +136,8 @@ const UnifiedCourses = () => {
 				await fetchCourses()
 				setError(null)
 			} catch (error) {
-				console.error('Error updating course:', error)
-				setError('Не удалось обновить курс')
+				console.error('Kursni yangilashda xato:', error)
+				setError("Kursni yangilab bo'lmadi")
 			} finally {
 				setLoading(false)
 			}
@@ -133,7 +147,7 @@ const UnifiedCourses = () => {
 
 	const deleteCourse = useCallback(
 		async courseId => {
-			if (!window.confirm('Вы уверены, что хотите удалить этот курс?')) return
+			if (!window.confirm("Bu kursni o'chirishga ishonchingiz komilmi?")) return
 
 			try {
 				setLoading(true)
@@ -146,15 +160,15 @@ const UnifiedCourses = () => {
 				)
 
 				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`)
+					throw new Error(`HTTP xato! status: ${response.status}`)
 				}
 
 				setSelectedCourse(null)
 				await fetchCourses()
 				setError(null)
 			} catch (error) {
-				console.error('Error deleting course:', error)
-				setError('Не удалось удалить курс')
+				console.error("Kursni o'chirishda xato:", error)
+				setError("Kursni o'chirib bo'lmadi")
 			} finally {
 				setLoading(false)
 			}
@@ -212,7 +226,11 @@ const UnifiedCourses = () => {
 
 	const removeMethodology = useCallback(
 		async monthIndex => {
-			if (!window.confirm('Удалить этот месяц?') || !selectedCourse) return
+			if (
+				!window.confirm("Bu oyni o'chirishni xohlaysizmi?") ||
+				!selectedCourse
+			)
+				return
 
 			const methodology = selectedCourse.methodology.filter(
 				(_, index) => index !== monthIndex
@@ -229,7 +247,11 @@ const UnifiedCourses = () => {
 
 	const removeLesson = useCallback(
 		async (monthIndex, lessonIndex) => {
-			if (!window.confirm('Удалить этот урок?') || !selectedCourse) return
+			if (
+				!window.confirm("Bu darsni o'chirishni xohlaysizmi?") ||
+				!selectedCourse
+			)
+				return
 
 			const methodology = [...selectedCourse.methodology]
 			methodology[monthIndex].lessons = methodology[monthIndex].lessons.filter(
@@ -252,27 +274,25 @@ const UnifiedCourses = () => {
 		}
 	}, [accessToken, fetchCourses])
 
-	// Мемоизированный компонент списка курсов
+	// Kurslar ro'yxati ko'rinishi
 	const CoursesView = useMemo(
 		() => (
 			<div className='min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4'>
 				<div className='max-w-7xl mx-auto'>
-					{/* Header */}
+					{/* Sarlavha */}
 					<div className='text-center mb-8'>
 						<div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mb-4 shadow-lg'>
 							<BookOpen className='w-8 h-8 text-white' />
 						</div>
 						<h1 className='text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-2'>
-							Управление курсами
+							Kurslar
 						</h1>
 						<p className='text-gray-600 text-lg'>
-							{user
-								? `Добро пожаловать, ${user.fullName}!`
-								: 'Управляйте всеми курсами и их содержанием'}
+							{user ? `Xush kelibsiz, ${user.fullName}!` : ''}
 						</p>
 					</div>
 
-					{/* Error Message */}
+					{/* Xato xabari */}
 					{error && (
 						<div className='mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3'>
 							<AlertCircle className='w-5 h-5 text-red-500 flex-shrink-0' />
@@ -286,21 +306,18 @@ const UnifiedCourses = () => {
 						</div>
 					)}
 
-					{/* Курсы Grid */}
+					{/* Kurslar jadvali */}
 					{dataLoading ? (
 						<div className='flex items-center justify-center py-12 mb-8'>
 							<div className='text-center'>
 								<div className='w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4'></div>
-								<p className='text-gray-600 text-lg'>Загрузка курсов...</p>
+								<p className='text-gray-600 text-lg'>Kurslar qidirilmoqda...</p>
 							</div>
 						</div>
 					) : !accessToken ? (
 						<div className='text-center py-12 mb-8'>
 							<AlertCircle className='w-16 h-16 text-red-300 mx-auto mb-4' />
-							<h3 className='text-lg font-medium text-red-600 mb-2'>
-								Требуется авторизация
-							</h3>
-							<p className='text-gray-500'>Пожалуйста, войдите в систему</p>
+							<p className='text-gray-500'>Tizimga kiring</p>
 						</div>
 					) : courses.length > 0 ? (
 						<div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8'>
@@ -325,25 +342,25 @@ const UnifiedCourses = () => {
 									<p className='text-gray-600 text-sm mb-4'>
 										{course.duration}{' '}
 										{course.duration_type === 'month'
-											? 'месяцев'
+											? 'oy'
 											: course.duration_type}{' '}
-										длительность
+										davomiyligi
 									</p>
 
 									<div className='space-y-2 text-sm mb-4'>
 										<div className='flex items-center justify-between'>
 											<div className='flex items-center gap-1 text-gray-500'>
 												<Users className='w-4 h-4' />
-												<span>{course.groups_count} групп</span>
+												<span>{course.groups_count} guruh</span>
 											</div>
 											<div className='flex items-center gap-1 text-blue-500'>
 												<Clock className='w-4 h-4' />
-												<span>{course.methodology?.length || 0} тем</span>
+												<span>{course.methodology?.length || 0} oy</span>
 											</div>
 										</div>
 										<div className='flex items-center justify-between'>
 											<span className='text-green-600 font-medium'>
-												{parseInt(course.price).toLocaleString()} сум
+												{parseInt(course.price).toLocaleString()} so'm
 											</span>
 										</div>
 									</div>
@@ -352,7 +369,7 @@ const UnifiedCourses = () => {
 										onClick={() => fetchCourse(course._id)}
 										className='w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl'
 									>
-										Подробнее
+										Batafsil
 									</button>
 								</div>
 							))}
@@ -361,9 +378,8 @@ const UnifiedCourses = () => {
 						<div className='text-center py-12 mb-8'>
 							<BookOpen className='w-16 h-16 text-gray-300 mx-auto mb-4' />
 							<h3 className='text-lg font-medium text-gray-600 mb-2'>
-								Курсы не найдены
+								Kurslar topilmadi
 							</h3>
-							<p className='text-gray-500'>Пока нет доступных курсов</p>
 						</div>
 					)}
 				</div>
@@ -372,21 +388,21 @@ const UnifiedCourses = () => {
 		[user, error, dataLoading, accessToken, courses, fetchCourse]
 	)
 
-	// Мемоизированный компонент деталей курса
+	// Kurs tafsilotlari ko'rinishi
 	const CourseDetails = useMemo(() => {
 		if (!selectedCourse) return null
 
 		return (
 			<div className='min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4'>
 				<div className='max-w-6xl mx-auto'>
-					{/* Header */}
+					{/* Orqaga va tugmalar */}
 					<div className='flex items-center justify-between mb-8'>
 						<button
 							onClick={() => setSelectedCourse(null)}
 							className='flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200'
 						>
 							<ArrowLeft className='w-5 h-5' />
-							Назад к курсам
+							Orqaga
 						</button>
 						<div className='flex gap-3'>
 							<button
@@ -394,19 +410,19 @@ const UnifiedCourses = () => {
 								className='flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 transition-colors duration-200 shadow-lg'
 							>
 								<Edit className='w-4 h-4' />
-								Редактировать
+								Tahrirlash
 							</button>
 							<button
 								onClick={() => deleteCourse(selectedCourse._id)}
 								className='flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors duration-200 shadow-lg'
 							>
 								<Trash2 className='w-4 h-4' />
-								Удалить
+								O'chirish
 							</button>
 						</div>
 					</div>
 
-					{/* Course Info */}
+					{/* Kurs ma'lumotlari */}
 					<div className='bg-white rounded-2xl shadow-lg p-8 mb-6 border border-gray-100'>
 						<h1 className='text-3xl font-bold text-gray-800 mb-6'>
 							{selectedCourse.name}
@@ -414,54 +430,54 @@ const UnifiedCourses = () => {
 
 						<div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'>
 							<div className='text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl'>
-								<p className='text-green-600 text-sm font-medium'>Стоимость</p>
+								<p className='text-green-600 text-sm font-medium'>Narxi</p>
 								<p className='text-2xl font-bold text-green-700'>
-									{parseInt(selectedCourse.price).toLocaleString()} сум
+									{parseInt(selectedCourse.price).toLocaleString()} so'm
 								</p>
 							</div>
 							<div className='text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl'>
-								<p className='text-blue-600 text-sm font-medium'>
-									Длительность
-								</p>
+								<p className='text-blue-600 text-sm font-medium'>Davomiyligi</p>
 								<p className='text-2xl font-bold text-blue-700'>
 									{selectedCourse.duration}{' '}
 									{selectedCourse.duration_type === 'month'
-										? 'мес.'
+										? 'oy'
 										: selectedCourse.duration_type}
 								</p>
 							</div>
 							<div className='text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl'>
-								<p className='text-purple-600 text-sm font-medium'>Групп</p>
+								<p className='text-purple-600 text-sm font-medium'>
+									Guruhlar soni
+								</p>
 								<p className='text-2xl font-bold text-purple-700'>
 									{selectedCourse.groups_count}
 								</p>
 							</div>
 						</div>
 
-						{/* Methodology Section */}
+						{/* Metodologiya bo'limi */}
 						<div className='flex justify-between items-center mb-6'>
 							<h2 className='text-2xl font-semibold text-gray-800'>
-								Методология курса
+								Kurs metodologiyasi
 							</h2>
 							<button
 								onClick={() => setShowAddMethod(true)}
 								className='flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg'
 							>
 								<Plus className='w-4 h-4' />
-								Добавить месяц
+								Oy qo'shish
 							</button>
 						</div>
 
-						{/* Add Method Form */}
+						{/* Yangi oy qo'shish formasi */}
 						{showAddMethod && (
 							<div className='bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6'>
 								<h3 className='font-semibold text-blue-800 mb-4'>
-									Добавить новый месяц
+									Yangi oy qo'shish
 								</h3>
 								<div className='flex flex-col md:flex-row gap-4'>
 									<input
 										type='text'
-										placeholder='Название месяца'
+										placeholder='Oy nomi'
 										value={newMethodTitle}
 										onChange={e => setNewMethodTitle(e.target.value)}
 										className='flex-1 px-4 py-3 border border-blue-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all duration-300'
@@ -473,7 +489,7 @@ const UnifiedCourses = () => {
 											disabled={loading || !newMethodTitle.trim()}
 											className='px-6 py-3 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 disabled:opacity-50 transition-colors duration-200'
 										>
-											{loading ? 'Добавление...' : 'Добавить'}
+											{loading ? 'Qo‘shilmoqda...' : 'Qo‘shish'}
 										</button>
 										<button
 											onClick={() => {
@@ -482,14 +498,14 @@ const UnifiedCourses = () => {
 											}}
 											className='px-6 py-3 bg-gray-500 text-white rounded-xl font-medium hover:bg-gray-600 transition-colors duration-200'
 										>
-											Отмена
+											Bekor qilish
 										</button>
 									</div>
 								</div>
 							</div>
 						)}
 
-						{/* Methodology Content */}
+						{/* Metodologiya kontenti */}
 						{selectedCourse.methodology &&
 						selectedCourse.methodology.length > 0 ? (
 							<div className='space-y-6'>
@@ -500,7 +516,7 @@ const UnifiedCourses = () => {
 									>
 										<div className='flex justify-between items-center mb-4'>
 											<h3 className='text-xl font-semibold text-gray-800'>
-												Месяц {method.month}: {method.title}
+												{method.month}-oy: {method.title}
 											</h3>
 											<div className='flex gap-2'>
 												<button
@@ -508,35 +524,35 @@ const UnifiedCourses = () => {
 													className='flex items-center gap-1 px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors duration-200'
 												>
 													<Plus className='w-3 h-3' />
-													Урок
+													Dars
 												</button>
 												<button
 													onClick={() => removeMethodology(monthIndex)}
 													className='flex items-center gap-1 px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors duration-200'
 												>
 													<Trash2 className='w-3 h-3' />
-													Удалить
+													O'chirish
 												</button>
 											</div>
 										</div>
 
-										{/* Add Lesson Form */}
+										{/* Dars qo'shish formasi */}
 										{selectedMonth === monthIndex && (
 											<div className='bg-white border border-blue-200 rounded-xl p-4 mb-4'>
 												<h4 className='font-semibold text-blue-800 mb-3'>
-													Добавить урок
+													Dars qo'shish
 												</h4>
 												<div className='space-y-3'>
 													<input
 														type='text'
-														placeholder='Название урока'
+														placeholder='Dars nomi'
 														value={newLessonTitle}
 														onChange={e => setNewLessonTitle(e.target.value)}
 														className='w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none'
 														autoFocus
 													/>
 													<textarea
-														placeholder='Описание урока'
+														placeholder='Dars tavsifi'
 														value={newLessonDesc}
 														onChange={e => setNewLessonDesc(e.target.value)}
 														className='w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none h-20 resize-none'
@@ -549,7 +565,7 @@ const UnifiedCourses = () => {
 															}
 															className='px-4 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors duration-200'
 														>
-															Добавить
+															Qo'shish
 														</button>
 														<button
 															onClick={() => {
@@ -559,14 +575,14 @@ const UnifiedCourses = () => {
 															}}
 															className='px-4 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors duration-200'
 														>
-															Отмена
+															Bekor qilish
 														</button>
 													</div>
 												</div>
 											</div>
 										)}
 
-										{/* Lessons List */}
+										{/* Darslar ro'yxati */}
 										{method.lessons && method.lessons.length > 0 ? (
 											<div className='space-y-3'>
 												{method.lessons.map((lesson, lessonIndex) => (
@@ -598,7 +614,7 @@ const UnifiedCourses = () => {
 										) : (
 											<div className='text-center py-8'>
 												<BookOpen className='w-12 h-12 text-gray-300 mx-auto mb-3' />
-												<p className='text-gray-500'>Уроки не добавлены</p>
+												<p className='text-gray-500'>Darslar mavjud emas</p>
 											</div>
 										)}
 									</div>
@@ -608,7 +624,7 @@ const UnifiedCourses = () => {
 							<div className='text-center py-12'>
 								<BookOpen className='w-16 h-16 text-gray-300 mx-auto mb-4' />
 								<p className='text-gray-500 text-lg'>
-									Методология не добавлена
+									Metodologiya qo'shilmagan
 								</p>
 							</div>
 						)}
@@ -631,7 +647,7 @@ const UnifiedCourses = () => {
 		deleteCourse,
 	])
 
-	// Мемоизированный компонент редактирования курса
+	// Kurs tahrirlash formasi
 	const EditCourseForm = useMemo(() => {
 		if (!editingCourse) return null
 
@@ -647,7 +663,7 @@ const UnifiedCourses = () => {
 			const handleSubmit = useCallback(async () => {
 				await updateCourse(editingCourse._id, formData)
 				setEditingCourse(null)
-			}, [formData])
+			}, [formData, editingCourse._id, updateCourse])
 
 			const handleInputChange = useCallback((field, value) => {
 				setFormData(prev => ({ ...prev, [field]: value }))
@@ -662,14 +678,14 @@ const UnifiedCourses = () => {
 									<Edit className='w-6 h-6 text-white' />
 								</div>
 								<h2 className='text-2xl font-bold text-gray-800'>
-									Редактирование курса
+									Kursni tahrirlash
 								</h2>
 							</div>
 
 							<div className='space-y-6'>
 								<div>
 									<label className='block text-sm font-medium text-gray-700 mb-2'>
-										Название курса
+										Kurs nomi
 									</label>
 									<input
 										type='text'
@@ -681,7 +697,7 @@ const UnifiedCourses = () => {
 
 								<div>
 									<label className='block text-sm font-medium text-gray-700 mb-2'>
-										Стоимость
+										Narxi
 									</label>
 									<input
 										type='number'
@@ -694,13 +710,16 @@ const UnifiedCourses = () => {
 								<div className='grid grid-cols-2 gap-4'>
 									<div>
 										<label className='block text-sm font-medium text-gray-700 mb-2'>
-											Длительность
+											Davomiyligi
 										</label>
 										<input
 											type='number'
 											value={formData.duration}
 											onChange={e =>
-												handleInputChange('duration', parseInt(e.target.value))
+												handleInputChange(
+													'duration',
+													parseInt(e.target.value) || 0
+												)
 											}
 											className='w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all duration-300'
 										/>
@@ -708,7 +727,7 @@ const UnifiedCourses = () => {
 
 									<div>
 										<label className='block text-sm font-medium text-gray-700 mb-2'>
-											Тип длительности
+											Davomiylik turi
 										</label>
 										<select
 											value={formData.duration_type}
@@ -717,16 +736,16 @@ const UnifiedCourses = () => {
 											}
 											className='w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all duration-300'
 										>
-											<option value='month'>Месяцы</option>
-											<option value='week'>Недели</option>
-											<option value='day'>Дни</option>
+											<option value='month'>Oy</option>
+											<option value='week'>Hafta</option>
+											<option value='day'>Kun</option>
 										</select>
 									</div>
 								</div>
 
 								<div>
 									<label className='block text-sm font-medium text-gray-700 mb-2'>
-										Количество групп
+										Guruhlar soni
 									</label>
 									<input
 										type='number'
@@ -734,7 +753,7 @@ const UnifiedCourses = () => {
 										onChange={e =>
 											handleInputChange(
 												'groups_count',
-												parseInt(e.target.value)
+												parseInt(e.target.value) || 0
 											)
 										}
 										className='w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all duration-300'
@@ -747,13 +766,13 @@ const UnifiedCourses = () => {
 										disabled={loading}
 										className='flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-xl font-medium hover:from-green-600 hover:to-green-700 disabled:opacity-50 transition-all duration-300 shadow-lg'
 									>
-										{loading ? 'Сохранение...' : 'Сохранить изменения'}
+										{loading ? 'Saqlanmoqda...' : "O'zgarishlarni saqlash"}
 									</button>
 									<button
 										onClick={() => setEditingCourse(null)}
 										className='flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-3 rounded-xl font-medium hover:from-gray-600 hover:to-gray-700 transition-all duration-300 shadow-lg'
 									>
-										Отмена
+										Bekor qilish
 									</button>
 								</div>
 							</div>
@@ -766,7 +785,7 @@ const UnifiedCourses = () => {
 		return <EditForm />
 	}, [editingCourse, loading, updateCourse])
 
-	// Основной рендер
+	// Asosiy render
 	if (editingCourse) {
 		return EditCourseForm
 	}
