@@ -30,7 +30,7 @@ ChartJS.register(
 )
 
 // ------- Configuration: adapt if your backend fields differ -------
-const API_BASE = 'https://zuhrstar-production.up.railway.app'
+const API_BASE = 'https://zuhr-star-production.up.railway.app'
 const PAYMENT_ENDPOINT = '/api/checks'
 const STUDENTS_ENDPOINT = '/api/students'
 const COURSES_ENDPOINT = '/api/Courses'

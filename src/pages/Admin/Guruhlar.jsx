@@ -19,7 +19,7 @@ import { setCredentials } from '../../redux/authSlice'
 
 const API_BASE =
 	import.meta?.env?.VITE_API_URL?.replace(/\/$/, '') ||
-	'https://zuhrstar-production.up.railway.app'
+	'https://zuhr-star-production.up.railway.app'
 
 const cls = (...a) => a.filter(Boolean).join(' ')
 const isoDate = d => new Date(d).toISOString().slice(0, 10)

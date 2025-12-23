@@ -52,7 +52,7 @@ export default function Kurslar() {
 
 	const [isSubmitting, setIsSubmitting] = useState(false)
 
-	const apiBase = 'https://zuhrstar-production.up.railway.app'
+	const apiBase = 'https://zuhr-star-production.up.railway.app'
 
 	// ------- утилиты нормализации -------
 	const gid = o => String(o?._id ?? o?.id ?? o?.group_id ?? '')
